@@ -2,9 +2,7 @@ package io.github.uditkarode.able.presentation.settings
 
 import android.content.Context
 import androidx.compose.foundation.background
-import androidx.preference.PreferenceManager
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -34,6 +33,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.preference.PreferenceManager
 import io.github.uditkarode.able.R
 
 private val Bg      = Color(0xFF212121)
@@ -69,54 +69,58 @@ fun SettingsScreen(
             .background(Bg)
             .statusBarsPadding(),
     ) {
-        // Toolbar
+        // ── Toolbar ───────────────────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(56.dp)
                 .background(Surface)
                 .padding(end = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_settings_black_24dp),
+                    painter           = painterResource(R.drawable.down_arrow),
                     contentDescription = "Back",
-                    tint = Gray,
+                    tint              = White,
+                    modifier          = Modifier.size(20.dp),
                 )
             }
-            Text("Settings", color = White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text       = "Settings",
+                color      = White,
+                fontSize   = 18.sp,
+                fontWeight = FontWeight.Bold,
+            )
         }
 
         Spacer(Modifier.height(8.dp))
 
-        // Source preference
+        // ── Preferences ───────────────────────────────────────────────────────
         PrefRow(
-            title = "Search source",
+            title   = "Search source",
             summary = sourceValue,
             onClick = { showSourceDialog = true },
         )
         HorizontalDivider(color = Surface, thickness = 0.5.dp)
 
-        // Play mode preference
         PrefRow(
-            title = "Play mode",
+            title   = "Play mode",
             summary = modeValue,
             onClick = { showModeDialog = true },
         )
         HorizontalDivider(color = Surface, thickness = 0.5.dp)
 
-        // Downloads nav
         PrefRow(
-            title = "Downloads",
+            title   = "Downloads",
             summary = "View active and queued downloads",
             onClick = onOpenDownloads,
         )
         HorizontalDivider(color = Surface, thickness = 0.5.dp)
 
-        // About nav
         PrefRow(
-            title = "About",
-            summary = "App info and support",
+            title   = "About",
+            summary = "App info and credits",
             onClick = onOpenAbout,
         )
         HorizontalDivider(color = Surface, thickness = 0.5.dp)
@@ -124,8 +128,8 @@ fun SettingsScreen(
 
     if (showSourceDialog) {
         PickerDialog(
-            title = "Search source",
-            options = sourceOptions,
+            title    = "Search source",
+            options  = sourceOptions,
             selected = sourceValue,
             onSelect = { choice ->
                 sourceValue = choice
@@ -138,8 +142,8 @@ fun SettingsScreen(
 
     if (showModeDialog) {
         PickerDialog(
-            title = "Play mode",
-            options = modeOptions,
+            title    = "Play mode",
+            options  = modeOptions,
             selected = modeValue,
             onSelect = { choice ->
                 modeValue = choice
@@ -157,11 +161,11 @@ private fun PrefRow(title: String, summary: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
+            .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
-        Text(title, color = White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(2.dp))
-        Text(summary, color = Gray, fontSize = 13.sp)
+        Text(title,   color = White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(3.dp))
+        Text(summary, color = Gray,  fontSize = 13.sp)
     }
 }
 
@@ -175,8 +179,8 @@ private fun PickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Surface,
-        title = { Text(title, color = White) },
+        containerColor   = Surface,
+        title            = { Text(title, color = White, fontWeight = FontWeight.Bold) },
         text = {
             Column {
                 options.forEach { option ->
@@ -189,9 +193,9 @@ private fun PickerDialog(
                     ) {
                         RadioButton(
                             selected = option == selected,
-                            onClick = { onSelect(option) },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = Accent,
+                            onClick  = { onSelect(option) },
+                            colors   = RadioButtonDefaults.colors(
+                                selectedColor   = Accent,
                                 unselectedColor = Gray,
                             ),
                         )
@@ -200,8 +204,8 @@ private fun PickerDialog(
                 }
             }
         },
-        confirmButton = {},
-        dismissButton = {
+        confirmButton  = {},
+        dismissButton  = {
             TextButton(onClick = onDismiss) { Text("Cancel", color = Gray) }
         },
     )
