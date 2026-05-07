@@ -12,6 +12,7 @@ data class PlaybackState(
     val isRepeating: Boolean = false,
     val positionMs: Int = 0,
     val durationMs: Int = 0,
+    val isSpotifyImporting: Boolean = false,
 ) {
     val currentSong: Song? get() = queue.getOrNull(currentIndex)
 }

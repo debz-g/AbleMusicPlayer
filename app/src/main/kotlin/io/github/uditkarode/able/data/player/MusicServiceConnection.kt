@@ -128,6 +128,8 @@ class MusicServiceConnection @Inject constructor() :
         _state.update { it.copy(isLoading = doLoad) }
     }
 
-    override fun spotifyImportChange(starting: Boolean) {}
+    override fun spotifyImportChange(starting: Boolean) {
+        _state.update { it.copy(isSpotifyImporting = starting) }
+    }
     override fun serviceStarted() {}
 }
