@@ -19,6 +19,7 @@
 package io.github.uditkarode.able
 
 import android.app.Application
+import dagger.hilt.android.HiltAndroidApp
 import io.github.inflationx.calligraphy3.CalligraphyConfig
 import io.github.inflationx.calligraphy3.CalligraphyInterceptor
 import io.github.inflationx.viewpump.ViewPump
@@ -26,6 +27,7 @@ import io.github.uditkarode.able.utils.Constants
 import io.github.uditkarode.able.utils.Shared
 import kotlin.concurrent.thread
 
+@HiltAndroidApp
 class AbleApplication : Application() {
     companion object {
         lateinit var viewPump: ViewPump
