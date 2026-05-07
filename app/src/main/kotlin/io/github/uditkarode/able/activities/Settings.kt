@@ -1,48 +1,26 @@
 package io.github.uditkarode.able.activities
 
+import android.content.Intent
 import android.os.Bundle
-import android.view.Menu
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
-import com.google.android.material.appbar.MaterialToolbar
-import com.takisoft.preferencex.PreferenceFragmentCompat
-import io.github.uditkarode.able.R
-import io.github.uditkarode.able.utils.Shared
-/**
- * The settings page.
- */
-class Settings: AppCompatActivity() {
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import dagger.hilt.android.AndroidEntryPoint
+import io.github.uditkarode.able.presentation.settings.SettingsScreen
+
+@AndroidEntryPoint
+class Settings : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-        setContentView(R.layout.settings_view)
-
-        val toolbar = findViewById<MaterialToolbar>(R.id.settings_toolbar)
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.title = getString(R.string.settings)
-
-        if (Shared.isFirstOpen) Shared.isFirstOpen = false
-        supportFragmentManager.beginTransaction()
-            .replace(
-                R.id.content,
-                SettingsFragment()
+        setContent {
+            SettingsScreen(
+                onBack = { finish() },
+                onOpenDownloads = {
+                    startActivity(Intent(this, Downloads::class.java))
+                },
+                onOpenAbout = {
+                    startActivity(Intent(this, About::class.java))
+                },
             )
-            .commit()
-    }
-
-    override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        return true
-    }
-}
-
-class SettingsFragment : PreferenceFragmentCompat() {
-    override fun onCreatePreferencesFix(savedInstanceState: Bundle?, rootKey: String?) {
-        setPreferencesFromResource(R.xml.preferences, null)
+        }
     }
 }
