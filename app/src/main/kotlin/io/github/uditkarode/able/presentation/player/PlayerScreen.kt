@@ -3,32 +3,46 @@ package io.github.uditkarode.able.presentation.player
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -40,86 +54,82 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.min
 import io.github.uditkarode.able.R
 import io.github.uditkarode.able.model.song.SongState
 import java.util.concurrent.TimeUnit
 import androidx.compose.foundation.Image
 
-// Background of the player screen (unchanged from original XML)
-private val BgColor = Color(0xFF212121)
-private val TextPrimary = Color(0xFFFBFBFB)
-private val TextSecondary = Color(0x80FBFBFB)
-private val AccentInactive = Color(0x80FBFBFB)
-private val AccentActive = Color(0x805E92F3)
+private val defaultHorizontalPadding = 20.dp
 
 private enum class DialogKind { EDIT_TITLE, EDIT_ARTIST, FETCH_ART }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     state: PlayerState,
     onIntent: (PlayerIntent) -> Unit,
-    onBack: () -> Unit,
-    onShowQueue: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     var dialogKind by remember { mutableStateOf<DialogKind?>(null) }
     var dialogInput by remember { mutableStateOf("") }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgColor)
-            .statusBarsPadding()
-            .navigationBarsPadding()
+            .background(MaterialTheme.colorScheme.surface)
+            .navigationBarsPadding(),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-
-            // ── Top bar ───────────────────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(75.dp)) {
+        // ── Top bar ──────────────────────────────────────────────────────
+        CenterAlignedTopAppBar(
+            title = {
+                Text(
+                    "Now Playing",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+            ),
+            navigationIcon = {
+                IconButton(onClick = onDismiss) {
                     Icon(
-                        painter = painterResource(R.drawable.down_arrow),
-                        contentDescription = "Back",
-                        tint = TextPrimary,
+                        Icons.Filled.ExpandMore,
+                        null,
+                        modifier = Modifier.size(32.dp),
                     )
                 }
-                IconButton(onClick = onShowQueue, modifier = Modifier.size(68.dp)) {
-                    Icon(
-                        painter = painterResource(R.drawable.pl_playlist),
-                        contentDescription = "Queue",
-                        tint = TextPrimary,
-                    )
-                }
-            }
+            },
+            actions = {
+                Spacer(modifier = Modifier.size(48.dp))
+            },
+        )
 
-            // ── Album art (1:1 square, fills remaining space above controls) ─
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center,
-            ) {
+        // ── Album art ────────────────────────────────────────────────────
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(bottom = 20.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            BoxWithConstraints {
+                val dimension = min(maxHeight, maxWidth)
+
                 Box(
                     modifier = Modifier
-                        .widthIn(max = 480.dp)
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp)
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF2A2A2A))
+                        .size(dimension)
+                        .padding(horizontal = defaultHorizontalPadding)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .combinedClickable(
                             onClick = {
                                 if (state.isLocalSong) {
@@ -137,223 +147,144 @@ fun PlayerScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     when {
-                        state.isLoading -> CircularProgressIndicator(color = state.seekbarColor)
+                        state.isLoading -> CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                        )
                         state.albumArt != null -> Image(
                             bitmap = state.albumArt.asImageBitmap(),
-                            contentDescription = "Album art",
-                            contentScale = ContentScale.FillBounds,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
                         )
                         else -> Icon(
-                            painter = painterResource(R.drawable.ic_music_note_black_24dp),
-                            contentDescription = "No art",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(128.dp),
+                            painterResource(R.drawable.ic_music_note_black_24dp),
+                            null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(100.dp),
                         )
                     }
                 }
             }
+        }
 
-            // ── Controls ──────────────────────────────────────────────────────
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp)
-            ) {
-
-                // Song name + artist
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 30.dp, vertical = 10.dp)
-                ) {
-                    Text(
-                        text = state.displaySongName,
-                        color = TextPrimary,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = if (state.isLocalSong) Modifier.combinedClickable(
-                            onClick = {
-                                dialogInput = state.displaySongName
-                                dialogKind = DialogKind.EDIT_TITLE
-                            },
-                            onLongClick = {},
-                        ) else Modifier,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = state.displayArtistName,
-                        color = TextSecondary,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = if (state.isLocalSong) Modifier.combinedClickable(
-                            onClick = {
-                                dialogInput = state.displayArtistName
-                                dialogKind = DialogKind.EDIT_ARTIST
-                            },
-                            onLongClick = {},
-                        ) else Modifier,
-                    )
-                }
-
-                // Seekbar
-                var isDragging by remember { mutableStateOf(false) }
-                var dragValue by remember { mutableFloatStateOf(0f) }
-
-                val sliderValue = if (isDragging) dragValue
-                    else if (state.durationMs > 0) state.positionMs.toFloat() / state.durationMs.toFloat()
-                    else 0f
-
-                Slider(
-                    value = sliderValue,
-                    onValueChange = { v ->
-                        isDragging = true
-                        dragValue = v
+        // ── Song info ────────────────────────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(defaultHorizontalPadding, 0.dp),
+        ) {
+            Text(
+                state.displaySongName,
+                style = MaterialTheme.typography.headlineSmall
+                    .copy(fontWeight = FontWeight.Bold),
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = if (state.isLocalSong) Modifier.combinedClickable(
+                    onClick = {
+                        dialogInput = state.displaySongName
+                        dialogKind = DialogKind.EDIT_TITLE
                     },
-                    onValueChangeFinished = {
-                        isDragging = false
-                        val seekMs = (dragValue * state.durationMs).toInt()
-                        onIntent(PlayerIntent.SeekTo(seekMs))
-                    },
-                    colors = SliderDefaults.colors(
-                        thumbColor = state.seekbarColor,
-                        activeTrackColor = state.seekbarColor,
-                        inactiveTrackColor = TextSecondary,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                    onLongClick = {},
+                ) else Modifier,
+            )
+            if (state.displayArtistName.isNotBlank()) {
+                Text(
+                    state.displayArtistName,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = if (state.isLocalSong) Modifier.combinedClickable(
+                        onClick = {
+                            dialogInput = state.displayArtistName
+                            dialogKind = DialogKind.EDIT_ARTIST
+                        },
+                        onLongClick = {},
+                    ) else Modifier,
                 )
-
-                // Time labels
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 26.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = msToTime(state.positionMs),
-                        color = TextSecondary,
-                        fontSize = 12.sp,
-                    )
-                    Text(
-                        text = msToTime(state.durationMs),
-                        color = TextSecondary,
-                        fontSize = 12.sp,
-                    )
-                }
-
-                Spacer(Modifier.height(10.dp))
-
-                // Playback controls row
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 26.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    // Shuffle
-                    IconButton(
-                        onClick = { onIntent(PlayerIntent.ToggleShuffle) },
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.shuffle),
-                            contentDescription = "Shuffle",
-                            tint = if (state.isShuffling) AccentActive else AccentInactive,
-                            modifier = Modifier.size(28.dp),
-                        )
-                    }
-
-                    // Previous
-                    IconButton(
-                        onClick = { onIntent(PlayerIntent.Previous) },
-                        modifier = Modifier.size(44.dp),
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.skip_previous),
-                            contentDescription = "Previous",
-                            tint = state.controlsColor,
-                            modifier = Modifier.size(30.dp),
-                        )
-                    }
-
-                    // Play / Pause (center, larger)
-                    IconButton(
-                        onClick = { onIntent(PlayerIntent.PlayPause) },
-                        modifier = Modifier.size(72.dp),
-                    ) {
-                        Icon(
-                            painter = painterResource(
-                                if (state.songState == SongState.playing) R.drawable.nobg_pause
-                                else R.drawable.nobg_play
-                            ),
-                            contentDescription = if (state.songState == SongState.playing) "Pause" else "Play",
-                            tint = state.controlsColor,
-                            modifier = Modifier.size(62.dp),
-                        )
-                    }
-
-                    // Next
-                    IconButton(
-                        onClick = { onIntent(PlayerIntent.Next) },
-                        modifier = Modifier.size(44.dp),
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.skip_next),
-                            contentDescription = "Next",
-                            tint = state.controlsColor,
-                            modifier = Modifier.size(30.dp),
-                        )
-                    }
-
-                    // Repeat
-                    IconButton(
-                        onClick = { onIntent(PlayerIntent.ToggleRepeat) },
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.repeat),
-                            contentDescription = "Repeat",
-                            tint = if (state.isRepeating) AccentActive else AccentInactive,
-                            modifier = Modifier.size(27.dp),
-                        )
-                    }
-                }
             }
+        }
 
-            // ── Cast row (disabled) ───────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 20.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+        Spacer(modifier = Modifier.height(defaultHorizontalPadding + 8.dp))
+
+        // ── Controls ─────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .padding(defaultHorizontalPadding, 0.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ControlButton(
+                icon = if (state.songState != SongState.playing) Icons.Filled.PlayArrow
+                       else Icons.Filled.Pause,
+                onClick = { onIntent(PlayerIntent.PlayPause) },
+                accent = true,
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            ControlButton(
+                icon = Icons.Filled.SkipPrevious,
+                onClick = { onIntent(PlayerIntent.Previous) },
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            ControlButton(
+                icon = Icons.Filled.SkipNext,
+                onClick = { onIntent(PlayerIntent.Next) },
+            )
+        }
+
+        Spacer(modifier = Modifier.height(defaultHorizontalPadding + 8.dp))
+
+        // ── Seekbar ──────────────────────────────────────────────────────
+        NowPlayingSeekBar(
+            positionMs = state.positionMs,
+            durationMs = state.durationMs,
+            onSeekTo = { onIntent(PlayerIntent.SeekTo(it)) },
+        )
+
+        Spacer(modifier = Modifier.height(defaultHorizontalPadding))
+
+        // ── Bottom bar ───────────────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp, end = 8.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = { }) {
                 Icon(
-                    painter = painterResource(R.drawable.cast),
-                    contentDescription = null,
-                    tint = TextSecondary,
+                    Icons.AutoMirrored.Filled.Sort,
+                    null,
                     modifier = Modifier.size(20.dp),
                 )
-                Spacer(Modifier.width(5.dp))
-                Text(
-                    text = "Cast (disabled)",
-                    color = TextSecondary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
+                Spacer(modifier = Modifier.width(8.dp))
+                val queueText = if (state.queue.isNotEmpty())
+                    "Playing ${state.currentIndex + 1} of ${state.queue.size}"
+                else "Queue"
+                Text(queueText, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = { onIntent(PlayerIntent.ToggleRepeat) }) {
+                Icon(
+                    Icons.Filled.Repeat,
+                    null,
+                    tint = when {
+                        state.isRepeating -> MaterialTheme.colorScheme.primary
+                        else -> LocalContentColor.current
+                    },
+                )
+            }
+            IconButton(onClick = { onIntent(PlayerIntent.ToggleShuffle) }) {
+                Icon(
+                    Icons.Filled.Shuffle,
+                    null,
+                    tint = when {
+                        state.isShuffling -> MaterialTheme.colorScheme.primary
+                        else -> LocalContentColor.current
+                    },
                 )
             }
         }
     }
 
-    // ── Dialogs ───────────────────────────────────────────────────────────────
+    // ── Dialogs ──────────────────────────────────────────────────────────
     when (dialogKind) {
         DialogKind.EDIT_TITLE -> InputDialog(
             title = stringResource(R.string.enter_new_song),
@@ -377,6 +308,176 @@ fun PlayerScreen(
     }
 }
 
+// ── Custom seekbar (Symphony style) ──────────────────────────────────────────
+
+@Composable
+private fun NowPlayingSeekBar(
+    positionMs: Int,
+    durationMs: Int,
+    onSeekTo: (Int) -> Unit,
+) {
+    val ratio = if (durationMs > 0) positionMs.toFloat() / durationMs.toFloat() else 0f
+
+    Row(
+        modifier = Modifier.padding(defaultHorizontalPadding, 0.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        var seekRatio by remember { mutableStateOf<Float?>(null) }
+
+        PositionText(
+            seekRatio?.let { (it * durationMs).toLong() } ?: positionMs.toLong(),
+            Alignment.CenterStart,
+        )
+        Box(modifier = Modifier.weight(1f)) {
+            SeekBarTrack(
+                ratio = ratio,
+                onSeekEnd = { r ->
+                    onSeekTo((r * durationMs).toInt())
+                    seekRatio = null
+                },
+                onSeek = { seekRatio = it },
+                onSeekStart = { seekRatio = 0f },
+                onSeekCancel = { seekRatio = null },
+            )
+        }
+        PositionText(durationMs.toLong(), Alignment.CenterEnd)
+    }
+}
+
+@Composable
+private fun SeekBarTrack(
+    ratio: Float,
+    onSeekStart: () -> Unit,
+    onSeek: (Float) -> Unit,
+    onSeekEnd: (Float) -> Unit,
+    onSeekCancel: () -> Unit,
+) {
+    val sliderHeight = 12.dp
+    val thumbSize = 12.dp
+    val thumbSizeHalf = thumbSize.div(2)
+    val trackHeight = 4.dp
+
+    var dragging by remember { mutableStateOf(false) }
+    var dragRatio by remember { mutableFloatStateOf(0f) }
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(sliderHeight),
+        contentAlignment = Alignment.Center,
+    ) {
+        val sliderWidth = maxWidth
+
+        Box(
+            modifier = Modifier
+                .height(sliderHeight)
+                .fillMaxWidth()
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { offset ->
+                            val tapRatio = (offset.x / sliderWidth.toPx()).coerceIn(0f..1f)
+                            onSeekEnd(tapRatio)
+                        }
+                    )
+                }
+                .pointerInput(Unit) {
+                    var offsetX = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            offsetX = offset.x
+                            dragging = true
+                            onSeekStart()
+                        },
+                        onDragEnd = {
+                            onSeekEnd(dragRatio)
+                            offsetX = 0f
+                            dragging = false
+                            dragRatio = 0f
+                        },
+                        onDragCancel = {
+                            onSeekCancel()
+                            offsetX = 0f
+                            dragging = false
+                            dragRatio = 0f
+                        },
+                        onHorizontalDrag = { pointer, dragAmount ->
+                            pointer.consume()
+                            offsetX += dragAmount
+                            dragRatio = (offsetX / sliderWidth.toPx()).coerceIn(0f..1f)
+                            onSeek(dragRatio)
+                        },
+                    )
+                }
+        )
+        Box(
+            modifier = Modifier
+                .padding(thumbSizeHalf, 0.dp)
+                .height(trackHeight)
+                .fillMaxWidth()
+                .background(
+                    MaterialTheme.colorScheme.surfaceVariant,
+                    RoundedCornerShape(thumbSizeHalf),
+                )
+        ) {
+            Box(
+                modifier = Modifier
+                    .height(trackHeight)
+                    .fillMaxWidth(if (dragging) dragRatio else ratio)
+                    .background(
+                        MaterialTheme.colorScheme.primary,
+                        RoundedCornerShape(thumbSizeHalf),
+                    )
+            )
+        }
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .size(thumbSize)
+                    .offset(
+                        sliderWidth
+                            .minus(thumbSizeHalf.times(2))
+                            .times(if (dragging) dragRatio else ratio),
+                        0.dp,
+                    )
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+            )
+        }
+    }
+}
+
+@Composable
+private fun PositionText(duration: Long, alignment: Alignment) {
+    val textStyle = MaterialTheme.typography.labelMedium
+    val formatted = msToTime(duration.toInt())
+    Box(contentAlignment = alignment) {
+        Text("0".repeat(formatted.length), style = textStyle.copy(color = Color.Transparent))
+        Text(formatted, style = textStyle)
+    }
+}
+
+// ── Control buttons ──────────────────────────────────────────────────────────
+
+@Composable
+private fun ControlButton(
+    icon: ImageVector,
+    onClick: () -> Unit,
+    accent: Boolean = false,
+) {
+    val bg = if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val tint = if (accent) MaterialTheme.colorScheme.onPrimary else LocalContentColor.current
+    IconButton(
+        modifier = Modifier
+            .size(56.dp)
+            .background(bg, CircleShape),
+        onClick = onClick,
+    ) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(28.dp))
+    }
+}
+
+// ── Dialogs ──────────────────────────────────────────────────────────────────
+
 @Composable
 private fun InputDialog(
     title: String,
@@ -387,32 +488,24 @@ private fun InputDialog(
     var text by remember(initial) { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title, color = TextPrimary) },
+        title = { Text(title) },
         text = {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    focusedBorderColor = Color(0xFF5E92F3),
-                    unfocusedBorderColor = TextSecondary,
-                    cursorColor = Color(0xFF5E92F3),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    cursorColor = MaterialTheme.colorScheme.primary,
                 ),
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(text) }) {
-                Text("OK", color = Color(0xFF5E92F3))
-            }
+            TextButton(onClick = { onConfirm(text) }) { Text("OK") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TextSecondary)
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         },
-        containerColor = Color(0xFF1E1E1E),
         shape = RoundedCornerShape(20.dp),
     )
 }

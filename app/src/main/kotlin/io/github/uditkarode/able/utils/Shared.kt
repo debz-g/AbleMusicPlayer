@@ -540,6 +540,20 @@ object Shared {
         return false
     }
 
+    private const val SONG_META_PREFS = "able_song_meta"
+
+    fun saveSongMeta(context: Context, fileName: String, title: String, artist: String) {
+        context.getSharedPreferences(SONG_META_PREFS, Context.MODE_PRIVATE).edit()
+            .putString("title:$fileName", title)
+            .putString("artist:$fileName", artist)
+            .apply()
+    }
+
+    fun getSongMetaArtist(context: Context, fileName: String): String {
+        return context.getSharedPreferences(SONG_META_PREFS, Context.MODE_PRIVATE)
+            .getString("artist:$fileName", "") ?: ""
+    }
+
     /**
      * @param musicFolder the File object pointing to a folder to check for songs in.
      * @return an ArrayList of Song objects containing all the Songs that the musicFolder
@@ -570,11 +584,33 @@ object Shared {
                 val path = it.getString(2)
                 val validAudio = path.endsWith(".mp3") || path.endsWith(".m4a") || path.endsWith(".webm")
                 if (validAudio && !path.contains(".tmp") && File(path).exists()) {
+                    var artist = it.getString(1) ?: ""
+                    var album = it.getString(3) ?: ""
+                    val title = it.getString(0) ?: File(path).nameWithoutExtension
+                    if (artist.isBlank() || artist == "<unknown>") {
+                        val mmr = android.media.MediaMetadataRetriever()
+                        try {
+                            mmr.setDataSource(path)
+                            mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                                ?.takeIf { a -> a.isNotBlank() }?.let { a -> artist = a }
+                            if (album.isBlank()) {
+                                mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                                    ?.takeIf { a -> a.isNotBlank() }?.let { a -> album = a }
+                            }
+                        } catch (_: Exception) {
+                        } finally {
+                            mmr.release()
+                        }
+                    }
+                    if (artist.isBlank() || artist == "<unknown>") {
+                        val meta = getSongMetaArtist(context, File(path).name)
+                        if (meta.isNotBlank()) artist = meta
+                    }
                     songs.add(Song(
-                        name = it.getString(0) ?: File(path).nameWithoutExtension,
-                        artist = it.getString(1) ?: "",
+                        name = title,
+                        artist = artist,
                         filePath = path,
-                        album = it.getString(3) ?: "",
+                        album = album,
                         albumId = it.getLong(4)
                     ))
                     indexedPaths.add(path)
@@ -600,6 +636,10 @@ object Shared {
                 } catch (_: Exception) {
                 } finally {
                     mmr.release()
+                }
+                if (artist.isBlank()) {
+                    val meta = getSongMetaArtist(context, f.name)
+                    if (meta.isNotBlank()) artist = meta
                 }
                 songs.add(Song(name = f.nameWithoutExtension, artist = artist, filePath = f.absolutePath, album = album))
                 unindexedPaths.add(f.absolutePath)

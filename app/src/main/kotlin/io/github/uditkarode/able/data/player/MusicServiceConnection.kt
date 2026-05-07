@@ -103,12 +103,13 @@ class MusicServiceConnection @Inject constructor() :
 
     override fun songChanged() {
         val service = boundService ?: return
+        val mp = service.getMediaPlayer()
         _state.update {
             it.copy(
                 queue        = service.getPlayQueue().toList(),
                 currentIndex = service.getCurrentIndex(),
                 positionMs   = 0,
-                durationMs   = 0,
+                durationMs   = try { mp.duration.coerceAtLeast(0) } catch (_: Exception) { 0 },
             )
         }
     }

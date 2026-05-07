@@ -309,11 +309,27 @@ class DownloadService : Service() {
                 artFile.renameTo(File(Constants.albumArtDir, finalFile.nameWithoutExtension))
             }
 
-            MediaScannerConnection.scanFile(this@DownloadService, arrayOf(finalFile.absolutePath), null, null)
             markAsDownloaded(this@DownloadService, song.youtubeLink)
+            Shared.saveSongMeta(this@DownloadService, finalFile.name, song.name, song.artist)
             Log.d("DL>", "Download complete: ${finalFile.name}")
-            downloadCompletedSinceLastCheck = true
-            mainHandler.post { onDownloadComplete?.invoke() }
+            MediaScannerConnection.scanFile(
+                this@DownloadService,
+                arrayOf(finalFile.absolutePath),
+                null,
+            ) { _, uri ->
+                if (uri != null) {
+                    val values = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.Audio.Media.TITLE, song.name)
+                        put(android.provider.MediaStore.Audio.Media.ARTIST, song.artist)
+                    }
+                    runCatching {
+                        contentResolver.update(uri, values, null, null)
+                        Log.d("DL>", "MediaStore updated: artist=${song.artist}")
+                    }
+                }
+                downloadCompletedSinceLastCheck = true
+                mainHandler.post { onDownloadComplete?.invoke() }
+            }
         } catch (e: Exception) {
             Log.e("ERR>", "Download failed: $e")
             currentStatus = "Download failed"
