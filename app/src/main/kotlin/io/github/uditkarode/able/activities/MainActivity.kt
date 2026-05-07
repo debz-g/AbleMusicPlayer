@@ -1,21 +1,3 @@
-/*
-    Copyright 2020 Udit Karode <udit.karode@gmail.com>
-
-    This file is part of AbleMusicPlayer.
-
-    AbleMusicPlayer is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, version 3 of the License.
-
-    AbleMusicPlayer is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with AbleMusicPlayer.  If not, see <https://www.gnu.org/licenses/>.
-*/
-
 package io.github.uditkarode.able.activities
 
 import android.Manifest
@@ -28,8 +10,8 @@ import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
-import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,11 +19,8 @@ import androidx.core.content.res.ResourcesCompat
 import androidx.preference.PreferenceManager
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.uditkarode.able.R
-import io.github.uditkarode.able.adapters.ViewPagerAdapter
 import io.github.uditkarode.able.data.player.MusicServiceConnection
-import io.github.uditkarode.able.fragments.Search
 import io.github.uditkarode.able.model.MusicMode
-import io.github.uditkarode.able.model.song.Song
 import io.github.uditkarode.able.presentation.main.MainScreen
 import io.github.uditkarode.able.presentation.main.MainViewModel
 import io.github.uditkarode.able.services.DownloadService
@@ -51,12 +30,8 @@ import org.schabi.newpipe.extractor.NewPipe
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
-/**
- * Entry-point activity. Hosts the Compose navigation shell (mini player + bottom nav)
- * while keeping legacy XML fragments alive in a ViewPager2 via AndroidView.
- */
 @AndroidEntryPoint
-class MainActivity : AppCompatActivity(), Search.SongCallback {
+class MainActivity : AppCompatActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
@@ -67,7 +42,6 @@ class MainActivity : AppCompatActivity(), Search.SongCallback {
         NewPipe.init(CustomDownloader.getInstance())
         Shared.cleanupTempFiles()
 
-        // First launch → go to Welcome screen
         if (!getSharedPreferences("able_prefs", MODE_PRIVATE)
                 .getBoolean("welcome_shown", false)
         ) {
@@ -77,7 +51,6 @@ class MainActivity : AppCompatActivity(), Search.SongCallback {
             return
         }
 
-        // Android 13+ notification permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -86,7 +59,6 @@ class MainActivity : AppCompatActivity(), Search.SongCallback {
 
         super.onCreate(savedInstanceState)
 
-        // Pre-load the default album art bitmap used across the app
         val rawDrawable = ResourcesCompat.getDrawable(resources, R.drawable.def_albart, null)
         if (rawDrawable is BitmapDrawable) {
             val out = ByteArrayOutputStream()
@@ -106,8 +78,22 @@ class MainActivity : AppCompatActivity(), Search.SongCallback {
                     onOpenPlayer    = {
                         startActivity(Intent(this@MainActivity, Player::class.java))
                     },
-                    vpSetup = { vp ->
-                        vp.adapter = ViewPagerAdapter(this@MainActivity)
+                    onOpenSettings  = {
+                        startActivity(Intent(this@MainActivity, Settings::class.java))
+                    },
+                    onSendItem      = { song, mode -> sendItem(song, mode) },
+                    onOpenGroup     = { title, songs ->
+                        LibraryDetail.pendingSongs = ArrayList(songs)
+                        startActivity(
+                            Intent(this@MainActivity, LibraryDetail::class.java)
+                                .putExtra("title", title)
+                        )
+                    },
+                    onOpenPlaylist  = { name ->
+                        startActivity(
+                            Intent(this@MainActivity, LocalPlaylist::class.java)
+                                .putExtra("name", name)
+                        )
                     },
                 )
             }
@@ -119,9 +105,7 @@ class MainActivity : AppCompatActivity(), Search.SongCallback {
         connection.unbind(this)
     }
 
-    // ── Search.SongCallback ───────────────────────────────────────────────────
-
-    override fun sendItem(song: Song, mode: String) {
+    private fun sendItem(song: io.github.uditkarode.able.model.song.Song, mode: String) {
         var currentMode = PreferenceManager.getDefaultSharedPreferences(this)
             .getString("mode_key", MusicMode.download)
         if (mode.isNotEmpty()) currentMode = mode
@@ -144,7 +128,6 @@ class MainActivity : AppCompatActivity(), Search.SongCallback {
                 }
                 Toast.makeText(this, "${song.name} ${getString(R.string.dl_added)}", Toast.LENGTH_SHORT).show()
             }
-
             MusicMode.stream -> {
                 viewModel.streamAudio(song)
             }

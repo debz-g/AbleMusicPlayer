@@ -1,5 +1,6 @@
 package io.github.uditkarode.able.presentation.library
 
+import io.github.uditkarode.able.model.song.Song
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -37,7 +38,7 @@ private val Accent  = Color(0xFF5E92F3)
 
 @Composable
 fun LibraryScreen(
-    onOpenGroup: (label: String, mode: LibraryMode) -> Unit,
+    onOpenGroup: (title: String, songs: List<Song>) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
@@ -68,7 +69,15 @@ fun LibraryScreen(
                     items(state.groups, key = { it.label }) { group ->
                         GroupRow(
                             group = group,
-                            onClick = { onOpenGroup(group.label, state.mode) },
+                            onClick = {
+                                val filtered = state.songs.filter { song ->
+                                    when (state.mode) {
+                                        LibraryMode.ARTISTS -> song.artist.ifBlank { "Unknown" } == group.label
+                                        LibraryMode.ALBUMS  -> song.album.ifBlank { "Unknown" }  == group.label
+                                    }
+                                }
+                                onOpenGroup(group.label, filtered)
+                            },
                         )
                         HorizontalDivider(color = Surface, thickness = 0.5.dp)
                     }

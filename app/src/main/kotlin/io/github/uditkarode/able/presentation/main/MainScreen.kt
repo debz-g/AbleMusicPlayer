@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,10 +29,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -40,67 +39,60 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.viewpager2.widget.ViewPager2
 import io.github.uditkarode.able.R
+import io.github.uditkarode.able.model.song.Song
+import io.github.uditkarode.able.presentation.home.HomeScreen
+import io.github.uditkarode.able.presentation.library.LibraryScreen
+import io.github.uditkarode.able.presentation.playlists.PlaylistsScreen
+import io.github.uditkarode.able.presentation.search.SearchScreen
+import kotlinx.coroutines.launch
 
-private val BgColor   = Color(0xFF212121)
-private val BgBottom  = Color(0xFF212121)
-private val White     = Color(0xFFFBFBFB)
-private val WhiteDim  = Color(0x80FBFBFB)
-private val Accent    = Color(0xFF5E92F3)
+private val BgColor  = Color(0xFF212121)
+private val BgBottom = Color(0xFF212121)
+private val White    = Color(0xFFFBFBFB)
+private val WhiteDim = Color(0x80FBFBFB)
+private val Accent   = Color(0xFF5E92F3)
 
-// Tab descriptor — keeps nav bar and ViewPager in sync
-private data class NavTab(val labelRes: Int, val iconRes: Int)
+private data class NavTab(val label: String, val iconRes: Int)
 
 private val tabs = listOf(
-    NavTab(R.string.home,      R.drawable.ic_home_black_24dp),
-    NavTab(R.string.search,    R.drawable.search),
-    NavTab(R.string.library,   R.drawable.ic_music_note_black_24dp),
-    NavTab(R.string.playlists, R.drawable.ic_library_music_black_24dp),
+    NavTab("Home",      R.drawable.ic_home_black_24dp),
+    NavTab("Search",    R.drawable.search),
+    NavTab("Library",   R.drawable.ic_music_note_black_24dp),
+    NavTab("Playlists", R.drawable.ic_library_music_black_24dp),
 )
 
-/**
- * Root Compose layout for MainActivity.
- *
- * @param miniPlayerState   Live state for the mini player bar.
- * @param onPlayPause       Forwarded to the ViewModel.
- * @param onOpenPlayer      Navigate to the full Player activity.
- * @param vpSetup           One-time ViewPager2 initialisation supplied by the Activity.
- */
 @Composable
 fun MainScreen(
     miniPlayerState: MiniPlayerState,
     onPlayPause: () -> Unit,
     onOpenPlayer: () -> Unit,
-    vpSetup: (ViewPager2) -> Unit,
+    onOpenSettings: () -> Unit,
+    onSendItem: (song: Song, mode: String) -> Unit,
+    onOpenGroup: (title: String, songs: List<Song>) -> Unit,
+    onOpenPlaylist: (name: String) -> Unit,
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    // Store the ViewPager2 reference so tab taps can call setCurrentItem
-    var viewPager by remember { mutableStateOf<ViewPager2?>(null) }
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { tabs.size })
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgColor)
-            .statusBarsPadding()
+            .statusBarsPadding(),
     ) {
-        // ── ViewPager2 content (fills all remaining vertical space) ──────────
-        Box(modifier = Modifier.weight(1f)) {
-            AndroidView(
-                factory = { ctx ->
-                    ViewPager2(ctx).also { vp ->
-                        vp.isUserInputEnabled = false
-                        vp.offscreenPageLimit = 3
-                        vpSetup(vp)
-                        viewPager = vp
-                    }
-                },
-                update = { vp ->
-                    if (vp.currentItem != selectedTab) vp.setCurrentItem(selectedTab, false)
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
+        // ── Tab content ───────────────────────────────────────────────────────
+        HorizontalPager(
+            state = pagerState,
+            userScrollEnabled = false,
+            modifier = Modifier.weight(1f),
+        ) { page ->
+            when (page) {
+                0 -> HomeScreen(onOpenSettings = onOpenSettings)
+                1 -> SearchScreen(onSendItem = onSendItem)
+                2 -> LibraryScreen(onOpenGroup = onOpenGroup)
+                3 -> PlaylistsScreen(onOpenPlaylist = onOpenPlaylist)
+            }
         }
 
         // ── Mini player bar ───────────────────────────────────────────────────
@@ -110,7 +102,6 @@ fun MainScreen(
             onExpand    = onOpenPlayer,
         )
 
-        // ── 1 dp divider between mini player and bottom nav ──────────────────
         HorizontalDivider(color = Color.Black, thickness = 1.dp)
 
         // ── Bottom navigation ─────────────────────────────────────────────────
@@ -121,11 +112,10 @@ fun MainScreen(
         ) {
             tabs.forEachIndexed { index, tab ->
                 NavigationBarItem(
-                    selected  = selectedTab == index,
+                    selected  = pagerState.currentPage == index,
                     onClick   = {
-                        if (selectedTab != index) {
-                            selectedTab = index
-                            viewPager?.setCurrentItem(index, false)
+                        if (pagerState.currentPage != index) {
+                            scope.launch { pagerState.scrollToPage(index) }
                         }
                     },
                     icon = {
@@ -135,18 +125,7 @@ fun MainScreen(
                             modifier = Modifier.size(24.dp),
                         )
                     },
-                    label = {
-                        Text(
-                            // Using hardcoded strings to avoid resource look-up in tight recompose
-                            text = when (index) {
-                                0 -> "Home"
-                                1 -> "Search"
-                                2 -> "Library"
-                                else -> "Playlists"
-                            },
-                            fontSize = 12.sp,
-                        )
-                    },
+                    label = { Text(tab.label, fontSize = 12.sp) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor   = White,
                         selectedTextColor   = White,
@@ -177,7 +156,6 @@ private fun MiniPlayerBar(
         .background(BgBottom)
         .clickable(enabled = state.isVisible, onClick = onExpand)
     ) {
-        // ── Seekbar row (1 dp track, or indeterminate when loading) ──────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -185,23 +163,21 @@ private fun MiniPlayerBar(
         ) {
             if (state.isLoading) {
                 LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color    = Accent,
+                    modifier   = Modifier.fillMaxWidth(),
+                    color      = Accent,
                     trackColor = WhiteDim,
                 )
             } else {
-                // Static thin seek track
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(1.dp)
                         .background(WhiteDim)
                 )
-                // Progress fill
                 val animatedFraction by animateFloatAsState(
-                    targetValue = seekFraction,
-                    animationSpec = tween(300),
-                    label = "seekProgress"
+                    targetValue    = seekFraction,
+                    animationSpec  = tween(300),
+                    label          = "seekProgress",
                 )
                 Box(
                     modifier = Modifier
@@ -212,7 +188,6 @@ private fun MiniPlayerBar(
             }
         }
 
-        // ── Content row ───────────────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -220,37 +195,28 @@ private fun MiniPlayerBar(
                 .padding(horizontal = 15.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Expand arrow
             Icon(
                 painter = painterResource(R.drawable.up_arrow),
                 contentDescription = "Open player",
-                tint = White,
+                tint     = White,
                 modifier = Modifier.size(32.dp),
             )
-
             Spacer(Modifier.width(5.dp))
-
-            // Song name • artist (scrolling text)
-            val label = when {
-                !state.isVisible -> "AbleMusicPlayer"
-                else -> "${state.songName} • ${state.artistName}"
-            }
+            val label = if (!state.isVisible) "AbleMusicPlayer"
+                        else "${state.songName} • ${state.artistName}"
             Text(
-                text = label,
-                color = White,
-                fontSize = 15.sp,
+                text       = label,
+                color      = White,
+                fontSize   = 15.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+                maxLines   = 1,
+                overflow   = TextOverflow.Ellipsis,
+                modifier   = Modifier.weight(1f),
             )
-
             Spacer(Modifier.width(10.dp))
-
-            // Play / Pause icon (hidden while loading)
             if (!state.isLoading && state.isVisible) {
                 IconButton(
-                    onClick = onPlayPause,
+                    onClick  = onPlayPause,
                     modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
@@ -258,7 +224,7 @@ private fun MiniPlayerBar(
                             if (state.isPlaying) R.drawable.pause else R.drawable.play
                         ),
                         contentDescription = if (state.isPlaying) "Pause" else "Play",
-                        tint = White,
+                        tint     = White,
                         modifier = Modifier.size(29.dp),
                     )
                 }
