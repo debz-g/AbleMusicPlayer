@@ -48,7 +48,7 @@ import android.util.Log
 import com.bumptech.glide.Glide
 import com.bumptech.glide.signature.ObjectKey
 import io.github.uditkarode.able.R
-import io.github.uditkarode.able.activities.Player
+import io.github.uditkarode.able.activities.MainActivity
 import io.github.uditkarode.able.model.song.Song
 import io.github.uditkarode.able.model.song.SongState
 import io.github.uditkarode.able.utils.ChunkedDownloader
@@ -232,7 +232,7 @@ class MusicService : Service(), AudioManager.OnAudioFocusChangeListener, Corouti
                     PendingIntent.getActivity(
                         this,
                         0,
-                        Intent(this, Player::class.java),
+                        Intent(this, MainActivity::class.java),
                         PendingIntent.FLAG_IMMUTABLE
                     )
                 )

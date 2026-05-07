@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -39,7 +40,11 @@ class PlaylistsViewModel @Inject constructor(
         load()
         connection.state
             .map { it.isSpotifyImporting }
-            .onEach { importing -> _state.update { it.copy(isImporting = importing) } }
+            .distinctUntilChanged()
+            .onEach { importing ->
+                _state.update { it.copy(isImporting = importing) }
+                if (!importing) load()
+            }
             .launchIn(viewModelScope)
     }
 

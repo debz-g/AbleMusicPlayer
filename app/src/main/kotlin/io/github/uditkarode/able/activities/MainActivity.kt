@@ -23,6 +23,7 @@ import io.github.uditkarode.able.data.player.MusicServiceConnection
 import io.github.uditkarode.able.model.MusicMode
 import io.github.uditkarode.able.presentation.main.MainScreen
 import io.github.uditkarode.able.presentation.main.MainViewModel
+import io.github.uditkarode.able.presentation.player.PlayerViewModel
 import io.github.uditkarode.able.services.DownloadService
 import io.github.uditkarode.able.utils.CustomDownloader
 import io.github.uditkarode.able.utils.Shared
@@ -34,6 +35,7 @@ import javax.inject.Inject
 class MainActivity : AppCompatActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private val playerViewModel: PlayerViewModel by viewModels()
 
     @Inject
     lateinit var connection: MusicServiceConnection
@@ -71,25 +73,22 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             MaterialTheme {
-                val miniPlayerState by viewModel.miniPlayerState.collectAsState()
+                val playerState by playerViewModel.state.collectAsState()
                 MainScreen(
-                    miniPlayerState = miniPlayerState,
-                    onPlayPause     = viewModel::playPause,
-                    onOpenPlayer    = {
-                        startActivity(Intent(this@MainActivity, Player::class.java))
-                    },
-                    onOpenSettings  = {
+                    playerState    = playerState,
+                    onPlayerIntent = playerViewModel::onIntent,
+                    onOpenSettings = {
                         startActivity(Intent(this@MainActivity, Settings::class.java))
                     },
-                    onSendItem      = { song, mode -> sendItem(song, mode) },
-                    onOpenGroup     = { title, songs ->
+                    onSendItem     = { song, mode -> sendItem(song, mode) },
+                    onOpenGroup    = { title, songs ->
                         LibraryDetail.pendingSongs = ArrayList(songs)
                         startActivity(
                             Intent(this@MainActivity, LibraryDetail::class.java)
                                 .putExtra("title", title)
                         )
                     },
-                    onOpenPlaylist  = { name ->
+                    onOpenPlaylist = { name ->
                         startActivity(
                             Intent(this@MainActivity, LocalPlaylist::class.java)
                                 .putExtra("name", name)
