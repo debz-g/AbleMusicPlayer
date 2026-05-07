@@ -25,7 +25,6 @@ import com.afollestad.materialdialogs.input.input
 import com.afollestad.materialdialogs.list.listItems
 import io.github.uditkarode.able.R
 import io.github.uditkarode.able.fragments.Home
-import io.github.uditkarode.able.fragments.Search
 import io.github.uditkarode.able.model.MusicMode
 import io.github.uditkarode.able.services.MusicService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,15 +34,6 @@ class SwipeControllerActions(
     private var mode: String,
     private var mService: MutableStateFlow<MusicService?>?
 ) {
-    private lateinit var itemPressed: Search.SongCallback
-
-    private fun initialiseSongCallback(context: Context?) {
-        try {
-            itemPressed = context as Activity as Search.SongCallback
-        } catch (e: ClassCastException) {
-            e.printStackTrace()
-        }
-    }
 
     fun onLeftClicked(context: Context?, position: Int) {
         when {
@@ -90,8 +80,7 @@ class SwipeControllerActions(
             }
 
             else -> {
-                initialiseSongCallback(context!!)
-                itemPressed.sendItem(Search.resultArray[position], "")
+                // Search tab now uses Compose — swipe actions handled there
             }
         }
     }
@@ -135,8 +124,7 @@ class SwipeControllerActions(
             }
 
             else -> {
-                initialiseSongCallback(context!!)
-                itemPressed.sendItem(Search.resultArray[position], mode)
+                // Search tab now uses Compose — swipe actions handled there
             }
         }
     }
