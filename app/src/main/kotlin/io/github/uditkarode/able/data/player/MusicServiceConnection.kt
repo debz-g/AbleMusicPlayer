@@ -28,6 +28,9 @@ class MusicServiceConnection @Inject constructor() :
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
+    private val _boundServiceFlow = MutableStateFlow<MusicService?>(null)
+    val boundServiceFlow: StateFlow<MusicService?> = _boundServiceFlow.asStateFlow()
+
     var boundService: MusicService? = null
         private set
 
@@ -61,6 +64,7 @@ class MusicServiceConnection @Inject constructor() :
     override fun onServiceConnected(name: ComponentName, binder: IBinder) {
         val service = (binder as MusicService.MusicBinder).getService()
         boundService = service
+        _boundServiceFlow.value = service
         // Eagerly sync the full state so observers get a consistent snapshot
         _state.update {
             PlaybackState(
@@ -79,6 +83,7 @@ class MusicServiceConnection @Inject constructor() :
 
     override fun onServiceDisconnected(name: ComponentName) {
         boundService = null
+        _boundServiceFlow.value = null
     }
 
     // ── MusicClient callbacks — convert to StateFlow updates ──────────────────

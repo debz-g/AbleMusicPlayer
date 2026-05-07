@@ -24,7 +24,6 @@ import com.afollestad.materialdialogs.input.getInputLayout
 import com.afollestad.materialdialogs.input.input
 import com.afollestad.materialdialogs.list.listItems
 import io.github.uditkarode.able.R
-import io.github.uditkarode.able.fragments.Home
 import io.github.uditkarode.able.model.MusicMode
 import io.github.uditkarode.able.services.MusicService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,97 +35,11 @@ class SwipeControllerActions(
 ) {
 
     fun onLeftClicked(context: Context?, position: Int) {
-        when {
-            mode.isEmpty() -> {
-                val current = Home.songAdapter?.getSong(position) ?: return
-                val playlists = Shared.getPlaylists()
-                val names = playlists.run {
-                    ArrayList<String>().also {
-                        for (playlist in this) it.add(
-                            playlist.name.replace(
-                                ".json",
-                                ""
-                            )
-                        )
-                    }
-                }
-
-                names.add(0, context!!.getString(R.string.pq))
-                names.add(1, context.getString(R.string.crp))
-                MaterialDialog(context).show {
-                    listItems(items = names) { _, index, _ ->
-                        when (index) {
-                            0 -> mService!!.value?.addToQueue(current)
-                            1 -> {
-                                MaterialDialog(context).show {
-                                    title(text = context.getString(R.string.playlist_namei))
-                                    input(context.getString(R.string.name_s)) { _, charSequence ->
-                                        Shared.createPlaylist(charSequence.toString(), context)
-                                        Shared.getPlaylists().firstOrNull {
-                                            it.name == "$charSequence.json"
-                                        }?.let { Shared.addToPlaylist(it, current, context) }
-                                    }
-                                    getInputLayout().boxBackgroundColor =
-                                        Color.parseColor("#000000")
-                                }
-                            }
-
-                            else -> {
-                                Shared.addToPlaylist(playlists[index - 2], current, context)
-                            }
-                        }
-                    }
-                }
-            }
-
-            else -> {
-                // Search tab now uses Compose — swipe actions handled there
-            }
-        }
+        // Home and Search tabs now use Compose — swipe actions handled in their screens
     }
 
     fun onRightClicked(context: Context?, position: Int) {
-        when {
-            mode.isEmpty() -> {
-                val ctx = context ?: return
-                val current = Home.songAdapter?.getSong(position) ?: return
-                MaterialDialog(ctx).show {
-                    title(text = ctx.getString(R.string.confirmation))
-                    message(
-                        text = ctx.getString(R.string.res_confirm_txt)
-                            .format(current.name, current.filePath)
-                    )
-                    positiveButton(text = "Delete") {
-                        val curFile = File(current.filePath)
-                        if (curFile.absolutePath.contains("Able")) {
-                            val curArt =
-                                File(
-                                    Constants.ableSongDir.absolutePath + "/album_art",
-                                    curFile.nameWithoutExtension
-                                )
-                            curFile.delete()
-                            curArt.delete()
-                        } else {
-                            try {
-                                curFile.delete()
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        }
-                        Home.songAdapter?.removeAt(position)
-                        MediaScannerConnection.scanFile(
-                            ctx,
-                            arrayOf(current.filePath), null, null
-                        )
-                    }
-                    negativeButton(text = ctx.getString(R.string.cancel))
-                }
-            }
-
-            else -> {
-                // Search tab now uses Compose — swipe actions handled there
-            }
-        }
+        // Home and Search tabs now use Compose — swipe actions handled in their screens
     }
 }
 

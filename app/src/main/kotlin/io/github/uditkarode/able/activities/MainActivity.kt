@@ -39,7 +39,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import io.github.uditkarode.able.R
 import io.github.uditkarode.able.adapters.ViewPagerAdapter
 import io.github.uditkarode.able.data.player.MusicServiceConnection
-import io.github.uditkarode.able.fragments.Home
 import io.github.uditkarode.able.fragments.Search
 import io.github.uditkarode.able.model.MusicMode
 import io.github.uditkarode.able.model.song.Song
@@ -63,9 +62,6 @@ class MainActivity : AppCompatActivity(), Search.SongCallback {
 
     @Inject
     lateinit var connection: MusicServiceConnection
-
-    // Kept as a field because sendItem() calls home.streamAudio()
-    private val home = Home()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         NewPipe.init(CustomDownloader.getInstance())
@@ -111,7 +107,7 @@ class MainActivity : AppCompatActivity(), Search.SongCallback {
                         startActivity(Intent(this@MainActivity, Player::class.java))
                     },
                     vpSetup = { vp ->
-                        vp.adapter = ViewPagerAdapter(this@MainActivity, home)
+                        vp.adapter = ViewPagerAdapter(this@MainActivity)
                     },
                 )
             }
@@ -150,7 +146,7 @@ class MainActivity : AppCompatActivity(), Search.SongCallback {
             }
 
             MusicMode.stream -> {
-                home.streamAudio(song)
+                viewModel.streamAudio(song)
             }
         }
     }

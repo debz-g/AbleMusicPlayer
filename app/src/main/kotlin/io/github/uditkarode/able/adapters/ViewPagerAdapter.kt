@@ -29,12 +29,12 @@ import io.github.uditkarode.able.fragments.Playlists
 /**
  * Adapter for ViewPager2 on MainActivity.
  */
-class ViewPagerAdapter(activity: FragmentActivity, private val home: Home) :
+class ViewPagerAdapter(activity: FragmentActivity) :
     FragmentStateAdapter(activity) {
 
     override fun createFragment(position: Int): Fragment {
         return when (position) {
-            0 -> home
+            0 -> Home()
             1 -> Search()
             2 -> Library()
             else -> Playlists()
