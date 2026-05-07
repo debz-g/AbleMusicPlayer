@@ -34,21 +34,14 @@ class MusicServiceConnection @Inject constructor() :
     var boundService: MusicService? = null
         private set
 
+    private var appContext: Context? = null
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     fun bind(context: Context) {
+        appContext = context.applicationContext
         MusicService.registerClient(this)
-        if (MusicService.isServiceRunning) {
-            try {
-                context.applicationContext.bindService(
-                    Intent(context, MusicService::class.java),
-                    this,
-                    Context.BIND_AUTO_CREATE
-                )
-            } catch (e: Exception) {
-                Log.e("MSConnection", "bindService failed: $e")
-            }
-        }
+        tryBind()
     }
 
     fun unbind(context: Context) {
@@ -56,6 +49,22 @@ class MusicServiceConnection @Inject constructor() :
         if (boundService != null) {
             try { context.applicationContext.unbindService(this) } catch (_: Exception) {}
             boundService = null
+            _boundServiceFlow.value = null
+        }
+    }
+
+    private fun tryBind() {
+        val ctx = appContext ?: return
+        if (MusicService.isServiceRunning && boundService == null) {
+            try {
+                ctx.bindService(
+                    Intent(ctx, MusicService::class.java),
+                    this,
+                    Context.BIND_AUTO_CREATE
+                )
+            } catch (e: Exception) {
+                Log.e("MSConnection", "bindService failed: $e")
+            }
         }
     }
 
@@ -131,5 +140,7 @@ class MusicServiceConnection @Inject constructor() :
     override fun spotifyImportChange(starting: Boolean) {
         _state.update { it.copy(isSpotifyImporting = starting) }
     }
-    override fun serviceStarted() {}
+    override fun serviceStarted() {
+        tryBind()
+    }
 }

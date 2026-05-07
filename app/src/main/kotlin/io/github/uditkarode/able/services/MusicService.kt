@@ -246,6 +246,23 @@ class MusicService : Service(), AudioManager.OnAudioFocusChangeListener, Corouti
                 .setOngoing(true)
                 .style = style
         }
+
+        // Android O+ requires startForeground() within 5 seconds of startForegroundService().
+        // Call it here in onCreate() with a minimal notification; showNotification() will
+        // update it with song info once playback begins.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            notificationManager.createNotificationChannel(
+                NotificationChannel("10002", getString(R.string.music), NotificationManager.IMPORTANCE_LOW).apply {
+                    enableLights(false)
+                    enableVibration(false)
+                }
+            )
+            startForeground(1, builder!!.setChannelId("10002").build())
+        }
+
+        // Notify any registered clients (e.g. MusicServiceConnection) that the
+        // service is now alive so they can bind.
+        registeredClients.forEach { it.serviceStarted() }
     }
 
     override fun onDestroy() {
