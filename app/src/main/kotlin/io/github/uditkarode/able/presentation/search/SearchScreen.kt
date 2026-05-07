@@ -81,7 +81,7 @@ fun SearchScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Color(0xFF212121))
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             SearchBar(
@@ -159,8 +159,8 @@ private fun SearchBar(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch() }),
             colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color(0xFF1A1A1A),
-                unfocusedContainerColor = Color(0xFF1A1A1A),
+                focusedContainerColor = Color(0xFF2C2C2C),
+                unfocusedContainerColor = Color(0xFF2C2C2C),
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent,
                 focusedTextColor = Color.White,
@@ -216,7 +216,7 @@ private fun ResultsList(
                 )
             }
             if (index < results.lastIndex) {
-                HorizontalDivider(color = Color(0xFF1A1A1A), thickness = 0.5.dp)
+                HorizontalDivider(color = Color(0xFF2C2C2C), thickness = 0.5.dp)
             }
         }
     }
@@ -244,7 +244,7 @@ private fun YtmResultItem(
             modifier = Modifier
                 .size(52.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(Color(0xFF1A1A1A)),
+                .background(Color(0xFF2C2C2C)),
         )
 
         Spacer(modifier = Modifier.width(12.dp))

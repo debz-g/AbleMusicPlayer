@@ -56,12 +56,12 @@ import io.github.uditkarode.able.utils.Constants
 import io.github.uditkarode.able.utils.Shared
 import java.io.File
 
-private val BgColor    = Color(0xFF000000)
-private val ItemBg     = Color(0xFF0D0D0D)
+private val BgColor    = Color(0xFF212121)
+private val ItemBg     = Color(0xFF2C2C2C)
 private val White      = Color(0xFFFBFBFB)
 private val Gray       = Color(0xFF888888)
 private val Accent     = Color(0xFF5E92F3)
-private val ActionGray = Color(0xFF2A2A2A)
+private val ActionGray = Color(0xFF383838)
 
 @Composable
 fun HomeScreen(
@@ -182,7 +182,7 @@ private fun SongList(
                 },
             )
             if (idx < songs.lastIndex) {
-                HorizontalDivider(color = Color(0xFF1A1A1A), thickness = 0.5.dp)
+                HorizontalDivider(color = Color(0xFF2C2C2C), thickness = 0.5.dp)
             }
         }
     }
@@ -309,8 +309,8 @@ private fun SongArt(song: Song) {
         modifier = Modifier
             .size(48.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1A1A1A)),
-        error = androidx.compose.ui.graphics.painter.ColorPainter(Color(0xFF1A1A1A)),
+            .background(Color(0xFF2C2C2C)),
+        error = androidx.compose.ui.graphics.painter.ColorPainter(Color(0xFF2C2C2C)),
     )
 }
 
@@ -372,7 +372,7 @@ private fun PlaylistPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF1A1A1A),
+        containerColor = Color(0xFF2C2C2C),
         title = { Text("Add to playlist", color = White) },
         text = {
             Column {
@@ -416,7 +416,7 @@ private fun CreatePlaylistDialog(
     var name by rememberSaveable { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF1A1A1A),
+        containerColor = Color(0xFF2C2C2C),
         title = { Text("New playlist", color = White) },
         text = {
             OutlinedTextField(
@@ -454,7 +454,7 @@ private fun DeleteConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF1A1A1A),
+        containerColor = Color(0xFF2C2C2C),
         title = { Text("Delete song?", color = White) },
         text = {
             Text(
