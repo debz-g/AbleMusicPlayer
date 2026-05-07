@@ -12,8 +12,8 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.palette.graphics.Palette
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.signature.ObjectKey
@@ -268,23 +268,14 @@ class PlayerViewModel @Inject constructor(
         val song = _state.value.currentSong ?: return
         if (!song.filePath.contains("emulated/0/")) return
         viewModelScope.launch(Dispatchers.IO) {
-            val ext = song.filePath.substringAfterLast(".")
-            val tempPath = "${song.filePath}.new.$ext"
-            val session = FFmpegKit.execute(
-                "-i \"${song.filePath}\" -y -c copy " +
-                "-metadata title=\"$newTitle\" " +
-                "-metadata artist=\"${_state.value.displayArtistName}\" " +
-                "\"$tempPath\""
-            )
-            when {
-                ReturnCode.isSuccess(session.returnCode) -> {
-                    File(song.filePath).delete()
-                    File(tempPath).renameTo(File(song.filePath))
-                    _state.update { it.copy(editedSongName = newTitle) }
-                    if (song.isLocal) scanAndUpdateNotification(song.filePath, newTitle, _state.value.displayArtistName)
-                }
-                else -> Log.e("PlayerVM", "FFmpeg title edit failed rc=${session.returnCode}")
-            }
+            runCatching {
+                val audioFile = AudioFileIO.read(File(song.filePath))
+                val tag = audioFile.tagOrCreateAndSetDefault
+                tag.setField(FieldKey.TITLE, newTitle)
+                audioFile.commit()
+                _state.update { it.copy(editedSongName = newTitle) }
+                if (song.isLocal) scanAndUpdateNotification(song.filePath, newTitle, _state.value.displayArtistName)
+            }.onFailure { Log.e("PlayerVM", "Title edit failed: $it") }
         }
     }
 
@@ -292,23 +283,14 @@ class PlayerViewModel @Inject constructor(
         val song = _state.value.currentSong ?: return
         if (!song.filePath.contains("emulated/0/")) return
         viewModelScope.launch(Dispatchers.IO) {
-            val ext = song.filePath.substringAfterLast(".")
-            val tempPath = "${song.filePath}.new.$ext"
-            val session = FFmpegKit.execute(
-                "-i \"${song.filePath}\" -c copy " +
-                "-metadata title=\"${_state.value.displaySongName}\" " +
-                "-metadata artist=\"$newArtist\" " +
-                "\"$tempPath\""
-            )
-            when {
-                ReturnCode.isSuccess(session.returnCode) -> {
-                    File(song.filePath).delete()
-                    File(tempPath).renameTo(File(song.filePath))
-                    _state.update { it.copy(editedArtistName = newArtist) }
-                    if (song.isLocal) scanAndUpdateNotification(song.filePath, _state.value.displaySongName, newArtist)
-                }
-                else -> Log.e("PlayerVM", "FFmpeg artist edit failed rc=${session.returnCode}")
-            }
+            runCatching {
+                val audioFile = AudioFileIO.read(File(song.filePath))
+                val tag = audioFile.tagOrCreateAndSetDefault
+                tag.setField(FieldKey.ARTIST, newArtist)
+                audioFile.commit()
+                _state.update { it.copy(editedArtistName = newArtist) }
+                if (song.isLocal) scanAndUpdateNotification(song.filePath, _state.value.displaySongName, newArtist)
+            }.onFailure { Log.e("PlayerVM", "Artist edit failed: $it") }
         }
     }
 

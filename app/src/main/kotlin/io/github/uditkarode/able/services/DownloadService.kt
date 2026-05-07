@@ -30,8 +30,8 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import androidx.core.graphics.drawable.toBitmap
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import io.github.uditkarode.able.R
@@ -215,8 +215,11 @@ class DownloadService : Service() {
             Log.d("DL>", "Resolving stream for ${song.name}")
             val streamInfo = StreamInfo.getInfo(song.youtubeLink)
 
-            // Pick the highest bitrate audio stream
-            val stream = streamInfo.audioStreams.maxByOrNull { it.averageBitrate }
+            // Prefer M4A (best jaudiotagger tag support); fall back to highest bitrate
+            val stream = streamInfo.audioStreams
+                .filter { it.getFormat()?.suffix?.lowercase() == "m4a" }
+                .maxByOrNull { it.averageBitrate }
+                ?: streamInfo.audioStreams.maxByOrNull { it.averageBitrate }
                 ?: streamInfo.audioStreams[0]
 
             val url = stream.content
@@ -245,68 +248,48 @@ class DownloadService : Service() {
                 currentProgress = progress
             }
 
-            // FFmpeg transcode / metadata
+            // Save in native format — no re-encoding, MediaPlayer handles m4a/webm natively
             builder.setContentText(getString(R.string.saving))
             builder.setProgress(100, 100, true)
             updateNotification()
             currentStatus = getString(R.string.saving)
             currentProgress = -1
 
-            var command = "-i " +
-                    "\"${tempFile.absolutePath}\" -c copy " +
-                    "-metadata title=\"${song.name}\" " +
-                    "-metadata artist=\"${song.artist}\" " +
-                    "-metadata comment=\"$id\" -y "
+            // Rename temp file to id-keyed file so addThumbnails can find its sidecar art
+            val idFile = File(Constants.ableSongDir, "$id.$ext")
+            tempFile.renameTo(idFile)
 
-            val mp3Bitrate = maxOf(bitrate, 128)
-            command += "-vn -ab ${mp3Bitrate}k -c:a mp3 -ar 44100 "
+            // Write title / artist / YouTube-ID tags with jaudiotagger (no native libs)
+            runCatching {
+                val audioFile = AudioFileIO.read(idFile)
+                val tag = audioFile.tagOrCreateAndSetDefault
+                tag.setField(FieldKey.TITLE, song.name)
+                tag.setField(FieldKey.ARTIST, song.artist)
+                tag.setField(FieldKey.COMMENT, id)
+                audioFile.commit()
+            }.onFailure { Log.e("ERR>", "Tag write failed: $it") }
 
-            command += "\"${Constants.ableSongDir.absolutePath}/$id.mp3\""
-
-            Log.d("DL>", "FFmpeg command: $command")
-
-            val session = FFmpegKit.execute(command)
-            when {
-                ReturnCode.isSuccess(session.returnCode) -> {
-                    tempFile.delete()
-                    val mp3File = File(Constants.ableSongDir, "$id.mp3")
-
-                    // Embed album art into MP3 metadata
-                    try {
-                        Shared.addThumbnails(mp3File.absolutePath, context = this@DownloadService)
-                    } catch (e: Exception) {
-                        Log.e("ERR>", "Failed to embed album art: $e")
-                    }
-
-                    // Rename file from YouTube ID to song name
-                    val sanitizedName = Shared.sanitizeFileName(song.name)
-                    val finalFile = Shared.uniqueFile(Constants.ableSongDir, sanitizedName, "mp3")
-                    mp3File.renameTo(finalFile)
-                    // Also rename sidecar album art to match
-                    val artFile = File(Constants.albumArtDir, id)
-                    if (artFile.exists()) {
-                        artFile.renameTo(File(Constants.albumArtDir, finalFile.nameWithoutExtension))
-                    }
-
-                    Log.d("DL>", "FFmpeg success, notifying Home")
-                    downloadCompletedSinceLastCheck = true
-                    mainHandler.post { onDownloadComplete?.invoke() }
-                }
-
-                ReturnCode.isCancel(session.returnCode) -> {
-                    Log.e("ERR>", "FFmpeg cancelled.")
-                    currentStatus = "Download cancelled"
-                    showError("Download cancelled")
-                    return
-                }
-
-                else -> {
-                    Log.e("ERR>", "FFmpeg failed with rc=${session.returnCode}")
-                    currentStatus = "Conversion failed"
-                    showError("Conversion failed")
-                    return
-                }
+            // Embed album art (looks for albumArtDir/$id)
+            try {
+                Shared.addThumbnails(idFile.absolutePath, context = this@DownloadService)
+            } catch (e: Exception) {
+                Log.e("ERR>", "Failed to embed album art: $e")
             }
+
+            // Rename to final human-readable song name
+            val sanitizedName = Shared.sanitizeFileName(song.name)
+            val finalFile = Shared.uniqueFile(Constants.ableSongDir, sanitizedName, ext)
+            idFile.renameTo(finalFile)
+
+            // Rename sidecar album art to match
+            val artFile = File(Constants.albumArtDir, id)
+            if (artFile.exists()) {
+                artFile.renameTo(File(Constants.albumArtDir, finalFile.nameWithoutExtension))
+            }
+
+            Log.d("DL>", "Download complete: ${finalFile.name}")
+            downloadCompletedSinceLastCheck = true
+            mainHandler.post { onDownloadComplete?.invoke() }
         } catch (e: Exception) {
             Log.e("ERR>", "Download failed: $e")
             currentStatus = "Download failed"

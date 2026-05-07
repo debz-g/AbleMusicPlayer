@@ -125,8 +125,7 @@ dependencies {
     // ── Media & Audio ─────────────────────────────────────────────────────────
     implementation(libs.palette.ktx)
     implementation(libs.jaudiotagger.android)
-    implementation(files("src/main/libs/ffmpeg-kit.aar"))
-    implementation("com.arthenica:smart-exception-java:0.2.1")
+    // ffmpeg-kit removed: tag editing uses jaudiotagger; downloads keep native format (m4a/webm)
 
     // ── Image Loading ─────────────────────────────────────────────────────────
     // Coil 3: primary loader for all Compose screens

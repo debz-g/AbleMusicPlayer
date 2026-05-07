@@ -27,8 +27,8 @@ import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.toBitmap
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import io.github.uditkarode.able.R
@@ -197,14 +197,17 @@ object SpotifyImport {
 
         // Resolve stream
         val streamInfo = StreamInfo.getInfo(searchResult.url)
-        val stream = streamInfo.audioStreams.maxByOrNull { it.averageBitrate }
+        // Prefer M4A for best jaudiotagger tag compatibility
+        val stream = streamInfo.audioStreams
+            .filter { it.getFormat()?.suffix?.lowercase() == "m4a" }
+            .maxByOrNull { it.averageBitrate }
+            ?: streamInfo.audioStreams.maxByOrNull { it.averageBitrate }
             ?: streamInfo.audioStreams.firstOrNull()
         if (stream == null) {
             Log.w(TAG, "No audio streams available for ${searchResult.url}")
             return null
         }
         val url = stream.content
-        val bitrate = stream.averageBitrate
         val ext = stream.getFormat()?.suffix ?: run {
             Log.w(TAG, "Stream has no known format for ${searchResult.url}")
             return null
@@ -225,31 +228,26 @@ object SpotifyImport {
             )
         }
 
-        // FFmpeg transcode + metadata (store YouTube ID in comment tag)
+        // Save in native format — no re-encoding needed
         currentTrackStatus = "Saving…"
         updateNotification(builder, context, displayName, "${trackIndex + 1} of $totalTracks — saving", totalTracks, trackIndex + 1, true)
 
-        val mp3Bitrate = maxOf(bitrate, 128)
-        val tmpMp3 = File(Constants.ableSongDir, "$songId.mp3")
-        val command = "-i \"${tempFile.absolutePath}\" -c copy " +
-                "-metadata title=\"${searchResult.name}\" " +
-                "-metadata artist=\"${searchResult.uploaderName}\" " +
-                "-metadata comment=\"$songId\" -y " +
-                "-vn -ab ${mp3Bitrate}k -c:a mp3 -ar 44100 " +
-                "\"${tmpMp3.absolutePath}\""
+        val idFile = File(Constants.ableSongDir, "$songId.$ext")
+        tempFile.renameTo(idFile)
 
-        val session = FFmpegKit.execute(command)
-        tempFile.delete()
-
-        if (!ReturnCode.isSuccess(session.returnCode)) {
-            Log.e(TAG, "FFmpeg failed for $songId with rc=${session.returnCode}")
-            tmpMp3.delete()
-            return null
-        }
+        // Write metadata tags with jaudiotagger
+        runCatching {
+            val audioFile = AudioFileIO.read(idFile)
+            val tag = audioFile.tagOrCreateAndSetDefault
+            tag.setField(FieldKey.TITLE, searchResult.name)
+            tag.setField(FieldKey.ARTIST, searchResult.uploaderName)
+            tag.setField(FieldKey.COMMENT, songId)
+            audioFile.commit()
+        }.onFailure { Log.e(TAG, "Tag write failed for $songId: $it") }
 
         // Rename to song title
-        val finalFile = Shared.uniqueFile(Constants.ableSongDir, sanitizedName, "mp3")
-        tmpMp3.renameTo(finalFile)
+        val finalFile = Shared.uniqueFile(Constants.ableSongDir, sanitizedName, ext)
+        idFile.renameTo(finalFile)
 
         // Save album art (keyed by final filename)
         if (thumbnailUrl.isNotBlank()) {
