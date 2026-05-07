@@ -1,5 +1,6 @@
 package io.github.uditkarode.able.presentation.about
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -21,9 +22,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -71,11 +75,17 @@ fun AboutScreen(
                     .padding(vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Image(
-                    painter            = painterResource(R.mipmap.ic_launcher_round),
-                    contentDescription = "App icon",
-                    modifier           = Modifier.size(48.dp),
-                )
+                val context = LocalContext.current
+                val appIconBitmap = remember {
+                    BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher_round)
+                }
+                if (appIconBitmap != null) {
+                    Image(
+                        bitmap             = appIconBitmap.asImageBitmap(),
+                        contentDescription = "App icon",
+                        modifier           = Modifier.size(48.dp),
+                    )
+                }
                 Spacer(Modifier.width(16.dp))
                 Text(
                     text       = "AbleMusic",
