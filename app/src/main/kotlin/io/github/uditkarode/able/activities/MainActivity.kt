@@ -8,7 +8,7 @@
     the Free Software Foundation, version 3 of the License.
 
     AbleMusicPlayer is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY without even the implied warranty of
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
@@ -19,382 +19,139 @@
 package io.github.uditkarode.able.activities
 
 import android.Manifest
-import android.annotation.SuppressLint
-import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
-import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.Bundle
-import android.os.IBinder
-import android.text.Html
-import android.view.TouchDelegate
-import android.view.View
-import android.view.animation.DecelerateInterpolator
 import android.widget.Toast
+import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.viewModels
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.core.content.res.ResourcesCompat
-import androidx.core.text.HtmlCompat
 import androidx.preference.PreferenceManager
-import androidx.viewpager2.widget.ViewPager2
-import com.bumptech.glide.Glide
-import com.google.android.material.bottomnavigation.BottomNavigationView
-import io.github.inflationx.viewpump.ViewPumpContextWrapper
-import io.github.uditkarode.able.AbleApplication
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.uditkarode.able.R
 import io.github.uditkarode.able.adapters.ViewPagerAdapter
-import io.github.uditkarode.able.databinding.ActivityMainBinding
+import io.github.uditkarode.able.data.player.MusicServiceConnection
 import io.github.uditkarode.able.fragments.Home
 import io.github.uditkarode.able.fragments.Search
 import io.github.uditkarode.able.model.MusicMode
 import io.github.uditkarode.able.model.song.Song
-import io.github.uditkarode.able.model.song.SongState
+import io.github.uditkarode.able.presentation.main.MainScreen
+import io.github.uditkarode.able.presentation.main.MainViewModel
 import io.github.uditkarode.able.services.DownloadService
-import io.github.uditkarode.able.services.MusicService
-import io.github.uditkarode.able.utils.Constants
 import io.github.uditkarode.able.utils.CustomDownloader
-import io.github.uditkarode.able.utils.MusicClientActivity
 import io.github.uditkarode.able.utils.Shared
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.NewPipe
 import java.io.ByteArrayOutputStream
+import javax.inject.Inject
 
 /**
- * First activity that shows up when the user opens the application
+ * Entry-point activity. Hosts the Compose navigation shell (mini player + bottom nav)
+ * while keeping legacy XML fragments alive in a ViewPager2 via AndroidView.
  */
-class MainActivity : MusicClientActivity(), Search.SongCallback {
-    private lateinit var bottomNavigation: BottomNavigationView
-    private lateinit var serviceConn: ServiceConnection
-    private lateinit var mainContent: ViewPager2
-    private lateinit var home: Home
-    private var seekbarJob: Job? = null
+@AndroidEntryPoint
+class MainActivity : AppCompatActivity(), Search.SongCallback {
 
-    private var mService: MusicService? = null
-    private var playing = false
-    private var isCurrentlyLoading = false
-    private lateinit var binding: ActivityMainBinding
+    private val viewModel: MainViewModel by viewModels()
+
+    @Inject
+    lateinit var connection: MusicServiceConnection
+
+    // Kept as a field because sendItem() calls home.streamAudio()
+    private val home = Home()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         NewPipe.init(CustomDownloader.getInstance())
         Shared.cleanupTempFiles()
 
+        // First launch → go to Welcome screen
         if (!getSharedPreferences("able_prefs", MODE_PRIVATE)
                 .getBoolean("welcome_shown", false)
         ) {
             super.onCreate(savedInstanceState)
-            startActivity(Intent(this@MainActivity, Welcome::class.java))
+            startActivity(Intent(this, Welcome::class.java))
             finish()
             return
         }
 
-        // Request notification permission for existing users (Android 13+)
+        // Android 13+ notification permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
         }
 
-        launch(Dispatchers.Main) {
-            Shared.defBitmap = (ResourcesCompat.getDrawable(
-                resources,
-                R.drawable.def_albart, null
-            ) as BitmapDrawable).bitmap
-            val outputStream = ByteArrayOutputStream()
-            Shared.defBitmap.compress(Bitmap.CompressFormat.JPEG, 20, outputStream)
-            val byte = outputStream.toByteArray()
-            Shared.defBitmap = BitmapFactory.decodeByteArray(
-                byte,
-                0, byte.size
-            )
-        }
-
         super.onCreate(savedInstanceState)
 
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
-        mainContent = binding.mainContent
-        binding.bbIcon.setOnClickListener {
-            if (Shared.serviceRunning(MusicService::class.java, this@MainActivity)) {
-                if (playing) mService?.setPlayPause(SongState.paused)
-                else mService?.setPlayPause(SongState.playing)
-            }
-        }
-        // extend the touchable area for the play button, since it's so small.
-        (binding.bbIcon.parent as View).post {
-            val rect = Rect().also {
-                binding.bbIcon.getHitRect(it)
-                it.top -= 200
-                it.left -= 200
-                it.bottom += 200
-                it.right += 200
-            }
-
-            (binding.bbIcon.parent as View).touchDelegate = TouchDelegate(rect, binding.bbIcon)
+        // Pre-load the default album art bitmap used across the app
+        val rawDrawable = ResourcesCompat.getDrawable(resources, R.drawable.def_albart, null)
+        if (rawDrawable is BitmapDrawable) {
+            val out = ByteArrayOutputStream()
+            rawDrawable.bitmap.compress(Bitmap.CompressFormat.JPEG, 20, out)
+            val bytes = out.toByteArray()
+            Shared.defBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         }
 
-        home = Home()
-        mainContent.isUserInputEnabled = false
-        mainContent.offscreenPageLimit = 3
-        mainContent.adapter = ViewPagerAdapter(this, home)
-        var currentPage = 0
-        bottomNavigation = binding.bottomNavigation
-        bottomNavigation.setOnItemSelectedListener { item ->
-            val newPage = when (item.itemId) {
-                R.id.home_menu -> 0
-                R.id.search_menu -> 1
-                R.id.library_menu -> 2
-                R.id.settings_menu -> 3
-                else -> 0
-            }
-            if (newPage != currentPage) {
-                val direction = if (newPage > currentPage) 1f else -1f
-                currentPage = newPage
-                mainContent.setCurrentItem(newPage, false)
-                mainContent.alpha = 0.5f
-                mainContent.translationX = direction * mainContent.width * 0.12f
-                mainContent.animate()
-                    .alpha(1f)
-                    .translationX(0f)
-                    .setDuration(100)
-                    .setInterpolator(DecelerateInterpolator())
-                    .start()
-            }
-            true
-        }
+        connection.bind(this)
 
-        binding.activitySeekbar.thumb.alpha = 0
-
-        binding.bbSong.isSelected = true
-
-        binding.bbSong.setOnClickListener {
-            if (Shared.serviceRunning(MusicService::class.java, this@MainActivity))
-                startActivity(Intent(this@MainActivity, Player::class.java))
-        }
-
-        binding.bbExpand.setOnClickListener {
-            if (Shared.serviceRunning(MusicService::class.java, this@MainActivity))
-                startActivity(Intent(this@MainActivity, Player::class.java))
-        }
-
-        serviceConn = object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName, service: IBinder) {
-                mService = (service as MusicService.MusicBinder).getService()
-                songChange()
-                playPauseEvent(service.getService().getMediaPlayer().run {
-                    if (this.isPlaying) SongState.playing
-                    else SongState.paused
-                })
-            }
-
-            override fun onServiceDisconnected(name: ComponentName) {}
-        }
-    }
-
-    private fun loadingEvent(loading: Boolean) {
-        isCurrentlyLoading = loading
-        binding.bbProgressBar.visibility = if (loading) View.VISIBLE else View.GONE
-        if (loading) {
-            binding.activitySeekbar.visibility = View.GONE
-            binding.bbIcon.visibility = View.INVISIBLE
-        } else {
-            binding.activitySeekbar.visibility = View.VISIBLE
-            binding.bbIcon.visibility = View.VISIBLE
-        }
-        binding.bnParent.invalidate()
-    }
-
-    private fun bindService() {
-        if (Shared.serviceRunning(MusicService::class.java, this@MainActivity))
-            bindService(
-                Intent(this@MainActivity, MusicService::class.java),
-                serviceConn,
-                0
-            )
-    }
-
-    fun playPauseEvent(state: SongState) {
-        launch(Dispatchers.Main) {
-            if (state == SongState.playing) {
-                if (isCurrentlyLoading) {
-                    loadingEvent(false)
-                }
-                Glide.with(this@MainActivity).load(R.drawable.pause)
-                    .into(binding.bbIcon)
-                playing = true
-            } else {
-                playing = false
-                Glide.with(this@MainActivity).load(R.drawable.play).into(binding.bbIcon)
-            }
-
-            if (isCurrentlyLoading) {
-                binding.bbIcon.visibility = View.INVISIBLE
-            }
-
-            if (state == SongState.playing) startSeekbarUpdates()
-            else seekbarJob?.cancel()
-        }
-    }
-
-    private fun startSeekbarUpdates() {
-        if (seekbarJob?.isActive == true) return
-        seekbarJob = launch {
-            while (isActive) {
-                binding.activitySeekbar.progress =
-                    mService?.getMediaPlayer()?.currentPosition ?: 0
-                delay(1000)
-            }
-        }
-    }
-
-    @SuppressLint("SetTextI18n")
-    fun songChange() {
-        if (mService != null) {
-            launch(Dispatchers.Main) {
-                val song = mService!!.getPlayQueue()[mService!!.getCurrentIndex()]
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    binding.bbSong.text = Html.fromHtml(
-                        "${song.name} <font color=\"#5e92f3\">•</font> ${song.artist}",
-                        HtmlCompat.FROM_HTML_MODE_LEGACY
-                    )
-                } else {
-                    binding.bbSong.text = "${song.name} • ${song.artist}"
-                }
-
-                binding.activitySeekbar.progress = 0
-
-                try {
-                    val duration = mService!!.getMediaPlayer().duration
-                    if (duration > 0) binding.activitySeekbar.max = duration
-                } catch (_: Exception) {}
-            }
-        }
-    }
-
-    override fun attachBaseContext(newBase: Context?) {
-        super.attachBaseContext(ViewPumpContextWrapper.wrap(newBase!!, AbleApplication.viewPump))
-    }
-
-    override fun onPause() {
-        super.onPause()
-        seekbarJob?.cancel()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (mService == null)
-            bindService()
-        else {
-            songChange()
-            if (MusicService.isLoading) {
-                loadingEvent(true)
-            } else {
-                playPauseEvent(
-                    if ((mService as MusicService)
-                            .getMediaPlayer().isPlaying
-                    ) SongState.playing else SongState.paused
+        setContent {
+            MaterialTheme {
+                val miniPlayerState by viewModel.miniPlayerState.collectAsState()
+                MainScreen(
+                    miniPlayerState = miniPlayerState,
+                    onPlayPause     = viewModel::playPause,
+                    onOpenPlayer    = {
+                        startActivity(Intent(this@MainActivity, Player::class.java))
+                    },
+                    vpSetup = { vp ->
+                        vp.adapter = ViewPagerAdapter(this@MainActivity, home)
+                    },
                 )
             }
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        connection.unbind(this)
+    }
+
+    // ── Search.SongCallback ───────────────────────────────────────────────────
+
     override fun sendItem(song: Song, mode: String) {
-        var currentMode = PreferenceManager.getDefaultSharedPreferences(this@MainActivity)
+        var currentMode = PreferenceManager.getDefaultSharedPreferences(this)
             .getString("mode_key", MusicMode.download)
-        if (mode.isNotEmpty())
-            currentMode = mode
+        if (mode.isNotEmpty()) currentMode = mode
 
         song.ytmThumbnail = Shared.upscaleThumbnailUrl(song.ytmThumbnail)
+
         when (currentMode) {
             MusicMode.download -> {
                 if (DownloadService.isAlreadyQueued(song.youtubeLink)) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "${song.name} is already downloading",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this, "${song.name} is already downloading", Toast.LENGTH_SHORT).show()
                     return
                 }
-                val songL = ArrayList<String>()
-                songL.add(song.name)
-                songL.add(song.youtubeLink)
-                songL.add(song.artist)
-                songL.add(song.ytmThumbnail)
-                val dlIntent = Intent(this@MainActivity, DownloadService::class.java)
-                    .putStringArrayListExtra("song", songL)
+                val extras = arrayListOf(song.name, song.youtubeLink, song.artist, song.ytmThumbnail)
+                val dlIntent = Intent(this, DownloadService::class.java)
+                    .putStringArrayListExtra("song", extras)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     startForegroundService(dlIntent)
                 } else {
                     startService(dlIntent)
                 }
-                Toast.makeText(
-                    this@MainActivity,
-                    "${song.name} ${getString(R.string.dl_added)}",
-                    Toast.LENGTH_SHORT
-                ).show()
-                /*
-                    * takes user back to the home screen when download starts *
-                    mainContent.currentItem = -1
-                    bottomNavigation.menu.findItem(R.id.home_menu)?.isChecked = true
-                 */
+                Toast.makeText(this, "${song.name} ${getString(R.string.dl_added)}", Toast.LENGTH_SHORT).show()
             }
 
             MusicMode.stream -> {
                 home.streamAudio(song)
-                launch(Dispatchers.Main) {
-                    loadingEvent(true)
-                }
             }
         }
-    }
-
-    override fun playStateChanged(state: SongState) {
-        playPauseEvent(state)
-    }
-
-    override fun songChanged() {
-        songChange()
-    }
-
-    override fun durationChanged(duration: Int) {
-        launch(Dispatchers.Main) {
-            binding.activitySeekbar.max = duration
-        }
-    }
-
-    override fun isExiting() {
-        finish()
-    }
-
-    override fun queueChanged(arrayList: ArrayList<Song>) {}
-
-    override fun shuffleRepeatChanged(onShuffle: Boolean, onRepeat: Boolean) {}
-
-    override fun indexChanged(index: Int) {}
-
-    override fun isLoading(doLoad: Boolean) {
-        if (doLoad) {
-            launch(Dispatchers.Main) {
-                loadingEvent(true)
-            }
-        }
-        // Don't call loadingEvent(false) here — prepareAsync completes
-        // before audio actually starts. Loading ends in playPauseEvent
-        // when SongState.playing is received.
-    }
-
-    override fun spotifyImportChange(starting: Boolean) {}
-
-    override fun serviceStarted() {
-        bindService()
     }
 }
