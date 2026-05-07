@@ -34,9 +34,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.uditkarode.able.R
 
-private val Bg     = Color(0xFF212121)
-private val White  = Color(0xFFFBFBFB)
-private val Gray   = Color(0xFF888888)
+private val Bg = Color(0xFF212121)
+private val White = Color(0xFFFBFBFB)
+private val Gray = Color(0xFF888888)
 private val Accent = Color(0xFF5E92F3)
 
 @Composable
@@ -54,10 +54,10 @@ fun AboutScreen(
         // ── Back button ───────────────────────────────────────────────────────
         IconButton(onClick = onBack, modifier = Modifier.padding(4.dp)) {
             Icon(
-                painter            = painterResource(R.drawable.down_arrow),
+                painter = painterResource(R.drawable.down_arrow),
                 contentDescription = "Back",
-                tint               = White,
-                modifier           = Modifier.size(20.dp),
+                tint = White,
+                modifier = Modifier.size(20.dp),
             )
         }
 
@@ -70,7 +70,7 @@ fun AboutScreen(
         ) {
             // App header
             Row(
-                modifier          = Modifier
+                modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -81,16 +81,16 @@ fun AboutScreen(
                 }
                 if (appIconBitmap != null) {
                     Image(
-                        bitmap             = appIconBitmap.asImageBitmap(),
+                        bitmap = appIconBitmap.asImageBitmap(),
                         contentDescription = "App icon",
-                        modifier           = Modifier.size(48.dp),
+                        modifier = Modifier.size(48.dp),
                     )
                 }
                 Spacer(Modifier.width(16.dp))
                 Text(
-                    text       = "AbleMusic",
-                    color      = White,
-                    fontSize   = 28.sp,
+                    text = "AbleMusic",
+                    color = White,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -113,21 +113,21 @@ fun AboutScreen(
             SectionHeader("Authors")
             Spacer(Modifier.height(12.dp))
 
-            AuthorItem(name = "Debayan",      role = "Developer")
+            AuthorItem(name = "Udit Karode", role = "OG Developer")
             Spacer(Modifier.height(12.dp))
-            AuthorItem(name = "Udit Karode",  role = "Original Developer")
+            AuthorItem(name = "Debayan", role = "Developer")
             Spacer(Modifier.height(12.dp))
-            AuthorItem(name = "Jayesh Seth",  role = "Developer")
+            AuthorItem(name = "Jayesh Seth", role = "Developer")
             Spacer(Modifier.height(12.dp))
-            AuthorItem(name = "Sajid Shaik",  role = "Graphics Designer")
+            AuthorItem(name = "Sajid Shaik", role = "Graphics Designer")
             Spacer(Modifier.height(12.dp))
             AuthorItem(name = "Safan Sulfikar", role = "Product Manager")
 
             Spacer(Modifier.height(24.dp))
 
             Text(
-                text     = "Also, huge thanks to the NewPipe team for the extractor.",
-                color    = Gray,
+                text = "Also, huge thanks to the NewPipe team for the extractor.",
+                color = Gray,
                 fontSize = 13.sp,
             )
 
@@ -135,13 +135,13 @@ fun AboutScreen(
 
             Button(
                 onClick = onOpenTelegram,
-                colors  = ButtonDefaults.buttonColors(containerColor = Color(0xFF29B6F6)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF29B6F6)),
             ) {
                 Icon(
-                    painter            = painterResource(R.drawable.telegram),
+                    painter = painterResource(R.drawable.telegram),
                     contentDescription = null,
-                    tint               = White,
-                    modifier           = Modifier.size(20.dp),
+                    tint = White,
+                    modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text("Support on Telegram", color = White, fontSize = 15.sp)
@@ -155,9 +155,9 @@ fun AboutScreen(
 @Composable
 private fun SectionHeader(title: String) {
     Text(
-        text       = title,
-        color      = Accent,
-        fontSize   = 13.sp,
+        text = title,
+        color = Accent,
+        fontSize = 13.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 0.8.sp,
     )
@@ -167,7 +167,7 @@ private fun SectionHeader(title: String) {
 private fun InfoItem(label: String, value: String) {
     Column {
         Text(value, color = White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        Text(label, color = Gray,  fontSize = 12.sp)
+        Text(label, color = Gray, fontSize = 12.sp)
     }
 }
 
@@ -175,6 +175,6 @@ private fun InfoItem(label: String, value: String) {
 private fun AuthorItem(name: String, role: String) {
     Column {
         Text(name, color = White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        Text(role, color = Gray,  fontSize = 12.sp)
+        Text(role, color = Gray, fontSize = 12.sp)
     }
 }
