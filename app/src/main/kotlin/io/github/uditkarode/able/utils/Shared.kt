@@ -568,7 +568,8 @@ object Shared {
         cursor?.use {
             while (it.moveToNext()) {
                 val path = it.getString(2)
-                if (path.endsWith(".mp3") && !path.contains(".tmp") && File(path).exists()) {
+                val validAudio = path.endsWith(".mp3") || path.endsWith(".m4a") || path.endsWith(".webm")
+                if (validAudio && !path.contains(".tmp") && File(path).exists()) {
                     songs.add(Song(
                         name = it.getString(0) ?: File(path).nameWithoutExtension,
                         artist = it.getString(1) ?: "",
@@ -584,8 +585,9 @@ object Shared {
         // Pick up any files not yet in MediaStore (title from filename, artist/album from metadata)
         val unindexedPaths = mutableListOf<String>()
         for (f in musicFolder.listFiles() ?: arrayOf()) {
-            if (!f.isDirectory && f.extension == "mp3" && !f.name.contains(".tmp")
-                && f.absolutePath !in indexedPaths) {
+            val ext = f.extension.lowercase()
+            if (!f.isDirectory && (ext == "mp3" || ext == "m4a" || ext == "webm")
+                && !f.name.contains(".tmp") && f.absolutePath !in indexedPaths) {
                 var artist = ""
                 var album = ""
                 val mmr = android.media.MediaMetadataRetriever()

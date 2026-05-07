@@ -24,6 +24,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.media.MediaScannerConnection
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -66,6 +67,22 @@ class DownloadService : Service() {
                 return activeLinks.contains(youtubeLink)
             }
         }
+
+        fun isAlreadyDownloaded(context: Context, youtubeLink: String): Boolean {
+            return context.getSharedPreferences(PREFS_DOWNLOADED, Context.MODE_PRIVATE)
+                .getStringSet(KEY_DOWNLOADED, emptySet())
+                ?.contains(youtubeLink) == true
+        }
+
+        private fun markAsDownloaded(context: Context, youtubeLink: String) {
+            val prefs = context.getSharedPreferences(PREFS_DOWNLOADED, Context.MODE_PRIVATE)
+            val existing = prefs.getStringSet(KEY_DOWNLOADED, emptySet())?.toMutableSet() ?: mutableSetOf()
+            existing.add(youtubeLink)
+            prefs.edit().putStringSet(KEY_DOWNLOADED, existing).apply()
+        }
+
+        private const val PREFS_DOWNLOADED = "downloaded_songs"
+        private const val KEY_DOWNLOADED = "links"
     }
 
     private lateinit var builder: Notification.Builder
@@ -119,6 +136,11 @@ class DownloadService : Service() {
         }
 
         val dlSong = DownloadableSong(song[0], song[2], song[1], song[3])
+
+        if (isAlreadyDownloaded(this, dlSong.youtubeLink)) {
+            if (queue.isEmpty()) stopSelf()
+            return START_NOT_STICKY
+        }
 
         synchronized(activeLinks) {
             if (!activeLinks.add(dlSong.youtubeLink)) {
@@ -287,6 +309,8 @@ class DownloadService : Service() {
                 artFile.renameTo(File(Constants.albumArtDir, finalFile.nameWithoutExtension))
             }
 
+            MediaScannerConnection.scanFile(this@DownloadService, arrayOf(finalFile.absolutePath), null, null)
+            markAsDownloaded(this@DownloadService, song.youtubeLink)
             Log.d("DL>", "Download complete: ${finalFile.name}")
             downloadCompletedSinceLastCheck = true
             mainHandler.post { onDownloadComplete?.invoke() }

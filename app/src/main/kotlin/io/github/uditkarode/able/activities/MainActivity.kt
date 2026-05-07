@@ -117,6 +117,10 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "${song.name} is already downloading", Toast.LENGTH_SHORT).show()
                     return
                 }
+                if (DownloadService.isAlreadyDownloaded(this, song.youtubeLink)) {
+                    Toast.makeText(this, "${song.name} is already downloaded", Toast.LENGTH_SHORT).show()
+                    return
+                }
                 val extras = arrayListOf(song.name, song.youtubeLink, song.artist, song.ytmThumbnail)
                 val dlIntent = Intent(this, DownloadService::class.java)
                     .putStringArrayListExtra("song", extras)
