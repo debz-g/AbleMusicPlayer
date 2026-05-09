@@ -6,8 +6,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -56,7 +60,7 @@ import io.github.uditkarode.able.utils.Constants
 import io.github.uditkarode.able.utils.Shared
 import java.io.File
 
-private val BgColor    = Color(0xFF212121)
+private val BgColor    = Color(0xFF1A1A1A)
 private val ItemBg     = Color(0xFF2C2C2C)
 private val White      = Color(0xFFFBFBFB)
 private val Gray       = Color(0xFF888888)
@@ -104,6 +108,7 @@ fun HomeScreen(
 
                 else -> SongList(
                     songs = state.songs,
+                    recentSongs = state.recentSongs,
                     currentSongPath = state.currentSongPath,
                     playlists = state.playlists,
                     onIntent = viewModel::onIntent,
@@ -140,9 +145,54 @@ private fun HomeHeader(onOpenSettings: () -> Unit) {
     }
 }
 
+// ── Recently Added horizontal card ──────────────────────────────────────────
+
+@Composable
+private fun RecentSongCard(
+    song: Song,
+    isPlaying: Boolean,
+    onTap: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .width(130.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(ItemBg)
+            .clickable(onClick = onTap)
+            .padding(8.dp),
+    ) {
+        SongArt(
+            song = song,
+            size = 114,
+            cornerRadius = 8,
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text = song.name,
+            color = if (isPlaying) Accent else White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = song.artist.ifBlank { "Unknown Artist" },
+            color = Gray,
+            fontSize = 10.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+// ── Main song list with sections ────────────────────────────────────────────
+
 @Composable
 private fun SongList(
     songs: List<Song>,
+    recentSongs: List<Song>,
     currentSongPath: String,
     playlists: List<String>,
     onIntent: (HomeIntent) -> Unit,
@@ -156,6 +206,56 @@ private fun SongList(
     var deleteConfirmSong by remember { mutableStateOf<Song?>(null) }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        // ── Recently Added section ─────────────────────────────────
+        if (recentSongs.isNotEmpty()) {
+            item(key = "recent_header") {
+                Text(
+                    text = "Recently Added",
+                    color = White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 12.dp),
+                )
+            }
+
+            item(key = "recent_row") {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    itemsIndexed(
+                        recentSongs,
+                        key = { _, s -> "recent_${s.filePath.ifEmpty { s.youtubeLink }}" },
+                    ) { idx, song ->
+                        RecentSongCard(
+                            song = song,
+                            isPlaying = song.filePath == currentSongPath,
+                            onTap = {
+                                // Find the index in the full songs list
+                                val fullIndex = songs.indexOfFirst { it.filePath == song.filePath }
+                                if (fullIndex >= 0) onIntent(HomeIntent.TapSong(fullIndex))
+                            },
+                        )
+                    }
+                }
+            }
+
+            item(key = "recent_spacer") {
+                Spacer(Modifier.height(20.dp))
+            }
+        }
+
+        // ── All Songs section ──────────────────────────────────────
+        item(key = "all_songs_header") {
+            Text(
+                text = "All Songs",
+                color = White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp),
+            )
+        }
+
         itemsIndexed(songs, key = { _, s -> s.filePath.ifEmpty { s.youtubeLink } }) { idx, song ->
             SongItem(
                 song = song,
@@ -285,7 +385,11 @@ private fun SongItem(
 }
 
 @Composable
-private fun SongArt(song: Song) {
+private fun SongArt(
+    song: Song,
+    size: Int = 48,
+    cornerRadius: Int = 6,
+) {
     val model: Any = remember(song.filePath, song.albumId) {
         val artFile = File(
             Constants.ableSongDir.absolutePath + "/album_art",
@@ -307,8 +411,8 @@ private fun SongArt(song: Song) {
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = Modifier
-            .size(48.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .size(size.dp)
+            .clip(RoundedCornerShape(cornerRadius.dp))
             .background(Color(0xFF2C2C2C)),
         error = androidx.compose.ui.graphics.painter.ColorPainter(Color(0xFF2C2C2C)),
     )
@@ -475,4 +579,3 @@ private fun DeleteConfirmDialog(
         },
     )
 }
-

@@ -51,6 +51,8 @@ class MusicServiceConnection @Inject constructor() :
             boundService = null
             _boundServiceFlow.value = null
         }
+        // Reset playback state so a fresh session starts clean
+        _state.value = PlaybackState()
     }
 
     private fun tryBind() {
@@ -93,6 +95,8 @@ class MusicServiceConnection @Inject constructor() :
     override fun onServiceDisconnected(name: ComponentName) {
         boundService = null
         _boundServiceFlow.value = null
+        // Clear playback state so UI doesn't show stale data
+        _state.value = PlaybackState()
     }
 
     // ── MusicClient callbacks — convert to StateFlow updates ──────────────────
@@ -119,7 +123,10 @@ class MusicServiceConnection @Inject constructor() :
     }
 
     override fun isExiting() {
-        _state.update { it.copy(songState = SongState.paused) }
+        // Full reset — service is dying, so clear all playback state.
+        // This ensures the mini player disappears and no song is highlighted
+        // when the user returns after killing the app.
+        _state.value = PlaybackState()
     }
 
     override fun queueChanged(arrayList: ArrayList<Song>) {

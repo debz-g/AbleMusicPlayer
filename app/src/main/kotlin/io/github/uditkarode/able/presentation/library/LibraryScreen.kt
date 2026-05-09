@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-private val Bg      = Color(0xFF212121)
+private val Bg      = Color(0xFF1A1A1A)
 private val Surface = Color(0xFF2C2C2C)
 private val White   = Color(0xFFFBFBFB)
 private val Gray    = Color(0xFF888888)

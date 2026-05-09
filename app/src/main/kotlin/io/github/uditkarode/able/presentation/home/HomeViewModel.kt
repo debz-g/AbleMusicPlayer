@@ -19,6 +19,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
@@ -79,7 +81,8 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val songs = buildSongList()
             val playlists = Shared.getPlaylists().map { it.name.removeSuffix(".json") }
-            _state.update { it.copy(songs = songs, playlists = playlists, isLoading = false) }
+            val recentSongs = filterRecentSongs(songs)
+            _state.update { it.copy(songs = songs, recentSongs = recentSongs, playlists = playlists, isLoading = false) }
         }
     }
 
@@ -87,8 +90,22 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val songs = buildSongList()
             val playlists = Shared.getPlaylists().map { it.name.removeSuffix(".json") }
-            _state.update { it.copy(songs = songs, playlists = playlists) }
+            val recentSongs = filterRecentSongs(songs)
+            _state.update { it.copy(songs = songs, recentSongs = recentSongs, playlists = playlists) }
         }
+    }
+
+    private fun filterRecentSongs(songs: List<Song>): List<Song> {
+        val fourDaysAgo = System.currentTimeMillis() - (4L * 24 * 60 * 60 * 1000)
+        return songs.filter { song ->
+            if (song.filePath.isBlank()) return@filter false
+            try {
+                val lastModified = java.io.File(song.filePath).lastModified()
+                lastModified >= fourDaysAgo
+            } catch (_: Exception) {
+                false
+            }
+        }.sortedByDescending { java.io.File(it.filePath).lastModified() }
     }
 
     private fun buildSongList(): List<Song> {
@@ -118,20 +135,12 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch(Dispatchers.Main) {
             val service = connection.boundService
-            if (service != null) {
-                service.setQueue(ArrayList(songs))
-                service.setIndex(index)
-                if (service.getShuffle()) {
-                    service.setShuffleRepeat(shuffle = true, repeat = service.getRepeat())
-                }
-            } else {
-                connection.boundServiceFlow.collect { svc ->
-                    if (svc != null) {
-                        svc.setQueue(ArrayList(songs))
-                        svc.setIndex(index)
-                        return@collect
-                    }
-                }
+                ?: connection.boundServiceFlow.filterNotNull().first()
+
+            service.setQueue(ArrayList(songs))
+            service.setIndex(index)
+            if (service.getShuffle()) {
+                service.setShuffleRepeat(shuffle = true, repeat = service.getRepeat())
             }
         }
     }

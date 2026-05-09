@@ -12,15 +12,17 @@ class Settings : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            SettingsScreen(
-                onBack = { finish() },
-                onOpenDownloads = {
-                    startActivity(Intent(this, Downloads::class.java))
-                },
-                onOpenAbout = {
-                    startActivity(Intent(this, About::class.java))
-                },
-            )
+            io.github.uditkarode.able.presentation.theme.AbleTheme {
+                SettingsScreen(
+                    onBack = { finish() },
+                    onOpenDownloads = {
+                        startActivity(Intent(this, Downloads::class.java))
+                    },
+                    onOpenAbout = {
+                        startActivity(Intent(this, About::class.java))
+                    },
+                )
+            }
         }
     }
 }

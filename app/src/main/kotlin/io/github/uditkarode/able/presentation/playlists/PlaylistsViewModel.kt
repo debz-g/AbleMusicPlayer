@@ -50,6 +50,11 @@ class PlaylistsViewModel @Inject constructor(
 
     fun reload() = load()
 
+    fun createPlaylist(name: String) {
+        Shared.createPlaylist(name, context)
+        load()
+    }
+
     fun deletePlaylist(playlist: Playlist) {
         viewModelScope.launch(Dispatchers.IO) {
             File(Constants.playlistFolder.absolutePath + "/" + playlist.name).delete()

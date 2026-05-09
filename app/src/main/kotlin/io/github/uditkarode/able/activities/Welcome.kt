@@ -12,16 +12,18 @@ class Welcome : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            WelcomeScreen(
-                onContinue = {
-                    getSharedPreferences("able_prefs", MODE_PRIVATE)
-                        .edit()
-                        .putBoolean("welcome_shown", true)
-                        .apply()
-                    startActivity(Intent(this, MainActivity::class.java))
-                    finish()
-                },
-            )
+            io.github.uditkarode.able.presentation.theme.AbleTheme {
+                WelcomeScreen(
+                    onContinue = {
+                        getSharedPreferences("able_prefs", MODE_PRIVATE)
+                            .edit()
+                            .putBoolean("welcome_shown", true)
+                            .apply()
+                        startActivity(Intent(this, MainActivity::class.java))
+                        finish()
+                    },
+                )
+            }
         }
     }
 }

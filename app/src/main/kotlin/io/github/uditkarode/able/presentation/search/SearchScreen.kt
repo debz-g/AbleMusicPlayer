@@ -81,7 +81,7 @@ fun SearchScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF212121))
+            .background(Color(0xFF1A1A1A))
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             SearchBar(

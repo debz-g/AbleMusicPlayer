@@ -12,12 +12,8 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.Color
 import androidx.core.content.res.ResourcesCompat
 import androidx.preference.PreferenceManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -75,22 +71,7 @@ class MainActivity : AppCompatActivity() {
         connection.bind(this)
 
         setContent {
-            val ableDarkColors = darkColorScheme(
-                primary = Color(0xFF5E92F3),
-                onPrimary = Color.White,
-                surface = Color(0xFF212121),
-                onSurface = Color(0xFFFBFBFB),
-                surfaceVariant = Color(0xFF2A2A2A),
-                onSurfaceVariant = Color(0xFFBBBBBB),
-                surfaceContainer = Color(0xFF292929),
-                surfaceContainerHigh = Color(0xFF333333),
-                surfaceTint = Color(0xFF5E92F3),
-                background = Color(0xFF212121),
-                onBackground = Color(0xFFFBFBFB),
-                outline = Color(0xFF444444),
-                inverseSurface = Color(0xFFFBFBFB),
-            )
-            MaterialTheme(colorScheme = ableDarkColors) {
+            io.github.uditkarode.able.presentation.theme.AbleTheme {
                 val playerState by playerViewModel.state.collectAsState()
                 MainScreen(
                     playerState    = playerState,

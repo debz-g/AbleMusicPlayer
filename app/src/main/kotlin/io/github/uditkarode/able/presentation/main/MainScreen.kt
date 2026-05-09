@@ -84,7 +84,7 @@ fun MainScreen(
             )
 
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ) {
                 tabs.forEachIndexed { index, tab ->

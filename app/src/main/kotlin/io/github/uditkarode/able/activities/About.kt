@@ -14,13 +14,15 @@ class About : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            AboutScreen(
-                buildType = BuildConfig.BUILD_TYPE,
-                onBack = { finish() },
-                onOpenTelegram = {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/AbleApp")))
-                },
-            )
+            io.github.uditkarode.able.presentation.theme.AbleTheme {
+                AboutScreen(
+                    buildType = BuildConfig.BUILD_TYPE,
+                    onBack = { finish() },
+                    onOpenTelegram = {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/AbleApp")))
+                    },
+                )
+            }
         }
     }
 }

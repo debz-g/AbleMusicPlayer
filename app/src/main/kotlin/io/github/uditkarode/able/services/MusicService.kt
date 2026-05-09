@@ -265,12 +265,26 @@ class MusicService : Service(), AudioManager.OnAudioFocusChangeListener, Corouti
         registeredClients.forEach { it.serviceStarted() }
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        cleanUp()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
     override fun onDestroy() {
         isServiceRunning = false
+        // Clear companion statics so a fresh service start doesn't inherit stale data
+        playQueue = ArrayList()
+        currentIndex = -1
+        previousIndex = -1
+        isLoading = false
+        isInstantiated = false
+        builder = null
         super.onDestroy()
         coroutineContext.cancelChildren()
         unregisterReceiver(receiver)
-        //exitProcess(0)
     }
 
     class MusicBinder(private val service: MusicService) : Binder() {
@@ -385,9 +399,14 @@ class MusicService : Service(), AudioManager.OnAudioFocusChangeListener, Corouti
      * @param state a SongState object used to play or pause audio.
      */
     fun setPlayPause(state: SongState) {
-        if (state == SongState.playing) playAudio()
-        else pauseAudio()
-
+        try {
+            if (state == SongState.playing) playAudio()
+            else pauseAudio()
+        } catch (e: Exception) {
+            Log.e("ERR>", "setPlayPause($state) failed: $e")
+        }
+        // Always dispatch the state change to clients even if playAudio/pauseAudio
+        // threw — so the UI stays in sync with the intended state.
         launch(Dispatchers.Default) {
             registeredClients.forEach { it.playStateChanged(state) }
         }
@@ -553,9 +572,14 @@ class MusicService : Service(), AudioManager.OnAudioFocusChangeListener, Corouti
                 mediaSessionPlay()
                 setPlayPause(SongState.playing)
 
+                // Capture values NOW to avoid races with companion statics
                 val dur = mediaPlayer.duration
+                val idx = currentIndex
+                val queue = ArrayList(playQueue)
                 launch(Dispatchers.Default) {
                     registeredClients.forEach { it.durationChanged(dur) }
+                    registeredClients.forEach { it.queueChanged(queue) }
+                    registeredClients.forEach { it.indexChanged(idx) }
                 }
             }
             launch(Dispatchers.IO) {
@@ -621,26 +645,29 @@ class MusicService : Service(), AudioManager.OnAudioFocusChangeListener, Corouti
         try {
             mediaPlayer.setDataSource(playQueue[currentIndex].filePath)
             mediaPlayer.prepare()
-
-            isLoading = false
-            launch(Dispatchers.Default) {
-                registeredClients.forEach { it.isLoading(false) }
-            }
-            mediaSessionPlay()
-            setPlayPause(SongState.playing)
-
-            val dur = mediaPlayer.duration
-            launch(Dispatchers.Default) {
-                registeredClients.forEach { it.durationChanged(dur) }
-            }
-            launch(Dispatchers.Default) {
-                registeredClients.forEach(MusicClient::songChanged)
-            }
-            launch(Dispatchers.Default) {
-                registeredClients.forEach { it.indexChanged(currentIndex) }
-            }
         } catch (e: Exception) {
-            Log.e("ERR>", "playSongFromFile: $e")
+            Log.e("ERR>", "playSongFromFile prepare failed: $e")
+            return
+        }
+
+        isLoading = false
+        launch(Dispatchers.Default) {
+            registeredClients.forEach { it.isLoading(false) }
+        }
+
+        // Start playback immediately — before the heavyweight notification logic
+        // so audio begins without delay.
+        mediaSessionPlay()
+        setPlayPause(SongState.playing)
+
+        // Capture values NOW to avoid races with companion statics
+        val dur = try { mediaPlayer.duration } catch (_: Exception) { 0 }
+        val idx = currentIndex
+        val queue = ArrayList(playQueue)
+        launch(Dispatchers.Default) {
+            registeredClients.forEach { it.durationChanged(dur) }
+            registeredClients.forEach { it.queueChanged(queue) }
+            registeredClients.forEach { it.indexChanged(idx) }
         }
     }
 
