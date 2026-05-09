@@ -33,6 +33,10 @@ class HomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
+    companion object {
+        private const val PAGE_SIZE = 30
+    }
+
     private val _state = MutableStateFlow(HomeState())
     val state: StateFlow<HomeState> = _state.asStateFlow()
 
@@ -82,7 +86,17 @@ class HomeViewModel @Inject constructor(
             val songs = buildSongList()
             val playlists = Shared.getPlaylists().map { it.name.removeSuffix(".json") }
             val recentSongs = filterRecentSongs(songs)
-            _state.update { it.copy(songs = songs, recentSongs = recentSongs, playlists = playlists, isLoading = false) }
+            val firstPage = songs.take(PAGE_SIZE)
+            _state.update {
+                it.copy(
+                    songs = songs,
+                    displayedSongs = firstPage,
+                    recentSongs = recentSongs,
+                    playlists = playlists,
+                    isLoading = false,
+                    hasMoreSongs = songs.size > PAGE_SIZE,
+                )
+            }
         }
     }
 
@@ -91,7 +105,29 @@ class HomeViewModel @Inject constructor(
             val songs = buildSongList()
             val playlists = Shared.getPlaylists().map { it.name.removeSuffix(".json") }
             val recentSongs = filterRecentSongs(songs)
-            _state.update { it.copy(songs = songs, recentSongs = recentSongs, playlists = playlists) }
+            val currentDisplayCount = _state.value.displayedSongs.size.coerceAtLeast(PAGE_SIZE)
+            val displayed = songs.take(currentDisplayCount)
+            _state.update {
+                it.copy(
+                    songs = songs,
+                    displayedSongs = displayed,
+                    recentSongs = recentSongs,
+                    playlists = playlists,
+                    hasMoreSongs = displayed.size < songs.size,
+                )
+            }
+        }
+    }
+
+    fun loadMore() {
+        val current = _state.value
+        if (!current.hasMoreSongs) return
+        val nextCount = (current.displayedSongs.size + PAGE_SIZE).coerceAtMost(current.songs.size)
+        _state.update {
+            it.copy(
+                displayedSongs = it.songs.take(nextCount),
+                hasMoreSongs = nextCount < it.songs.size,
+            )
         }
     }
 
@@ -171,7 +207,12 @@ class HomeViewModel @Inject constructor(
             file.delete()
             art.delete()
             MediaScannerConnection.scanFile(context, arrayOf(song.filePath), null, null)
-            _state.update { it.copy(songs = _state.value.songs.filter { s -> s.filePath != song.filePath }) }
+            _state.update {
+                it.copy(
+                    songs = it.songs.filter { s -> s.filePath != song.filePath },
+                    displayedSongs = it.displayedSongs.filter { s -> s.filePath != song.filePath },
+                )
+            }
         } catch (e: Exception) {
             Log.e("HomeVM", "Delete failed: $e")
         }

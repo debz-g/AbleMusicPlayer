@@ -107,11 +107,14 @@ fun HomeScreen(
                 }
 
                 else -> SongList(
-                    songs = state.songs,
+                    allSongs = state.songs,
+                    displayedSongs = state.displayedSongs,
                     recentSongs = state.recentSongs,
                     currentSongPath = state.currentSongPath,
                     playlists = state.playlists,
+                    hasMore = state.hasMoreSongs,
                     onIntent = viewModel::onIntent,
+                    onLoadMore = viewModel::loadMore,
                 )
             }
         }
@@ -191,11 +194,14 @@ private fun RecentSongCard(
 
 @Composable
 private fun SongList(
-    songs: List<Song>,
+    allSongs: List<Song>,
+    displayedSongs: List<Song>,
     recentSongs: List<Song>,
     currentSongPath: String,
     playlists: List<String>,
+    hasMore: Boolean,
     onIntent: (HomeIntent) -> Unit,
+    onLoadMore: () -> Unit,
 ) {
     // Track which song row has its action panel open
     var expandedPath by rememberSaveable { mutableStateOf("") }
@@ -232,7 +238,7 @@ private fun SongList(
                             isPlaying = song.filePath == currentSongPath,
                             onTap = {
                                 // Find the index in the full songs list
-                                val fullIndex = songs.indexOfFirst { it.filePath == song.filePath }
+                                val fullIndex = allSongs.indexOfFirst { it.filePath == song.filePath }
                                 if (fullIndex >= 0) onIntent(HomeIntent.TapSong(fullIndex))
                             },
                         )
@@ -256,14 +262,17 @@ private fun SongList(
             )
         }
 
-        itemsIndexed(songs, key = { _, s -> s.filePath.ifEmpty { s.youtubeLink } }) { idx, song ->
+        itemsIndexed(displayedSongs, key = { _, s -> s.filePath.ifEmpty { s.youtubeLink } }) { idx, song ->
+            // Find the real index in allSongs so the full queue is set on tap
+            val fullIndex = allSongs.indexOfFirst { it.filePath == song.filePath }
+
             SongItem(
                 song = song,
                 isPlaying = song.filePath == currentSongPath,
                 isExpanded = expandedPath == song.filePath,
                 onTap = {
                     expandedPath = ""
-                    onIntent(HomeIntent.TapSong(idx))
+                    if (fullIndex >= 0) onIntent(HomeIntent.TapSong(fullIndex))
                 },
                 onLongPress = {
                     expandedPath = if (expandedPath == song.filePath) "" else song.filePath
@@ -281,8 +290,33 @@ private fun SongList(
                     deleteConfirmSong = song
                 },
             )
-            if (idx < songs.lastIndex) {
+            if (idx < displayedSongs.lastIndex) {
                 HorizontalDivider(color = Color(0xFF2C2C2C), thickness = 0.5.dp)
+            }
+
+            // Trigger load more when near the end
+            if (hasMore && idx >= displayedSongs.size - 5) {
+                LaunchedEffect(displayedSongs.size) {
+                    onLoadMore()
+                }
+            }
+        }
+
+        // Loading indicator at the bottom while more pages exist
+        if (hasMore) {
+            item(key = "load_more_indicator") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        color = Accent,
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
             }
         }
     }
