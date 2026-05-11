@@ -67,8 +67,23 @@ import io.github.uditkarode.able.R
 import io.github.uditkarode.able.model.song.SongState
 import java.util.concurrent.TimeUnit
 import androidx.compose.foundation.Image
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalContext
 
 private val defaultHorizontalPadding = 20.dp
+
+private const val PREFS_NAME = "able_player_prefs"
+private const val KEY_CONTROL_LAYOUT = "control_layout"
+
+/** Position of the control button group across the screen width. */
+private enum class ControlLayout {
+    LEFT,
+    CENTER,
+    RIGHT;
+
+    fun next(): ControlLayout = entries[(ordinal + 1) % entries.size]
+}
 
 private enum class DialogKind { EDIT_TITLE, EDIT_ARTIST, FETCH_ART }
 
@@ -81,6 +96,16 @@ fun PlayerScreen(
 ) {
     var dialogKind by remember { mutableStateOf<DialogKind?>(null) }
     var dialogInput by remember { mutableStateOf("") }
+
+    // ── Control layout preference ────────────────────────────────────
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE) }
+    var controlLayout by rememberSaveable {
+        val saved = prefs.getString(KEY_CONTROL_LAYOUT, ControlLayout.CENTER.name)
+        mutableStateOf(
+            try { ControlLayout.valueOf(saved!!) } catch (_: Exception) { ControlLayout.CENTER }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -109,7 +134,16 @@ fun PlayerScreen(
                 }
             },
             actions = {
-                Spacer(modifier = Modifier.size(48.dp))
+                IconButton(onClick = {
+                    controlLayout = controlLayout.next()
+                    prefs.edit().putString(KEY_CONTROL_LAYOUT, controlLayout.name).apply()
+                }) {
+                    Icon(
+                        Icons.Filled.SwapHoriz,
+                        contentDescription = "Change control layout",
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
             },
         )
 
@@ -206,29 +240,13 @@ fun PlayerScreen(
         Spacer(modifier = Modifier.height(defaultHorizontalPadding + 8.dp))
 
         // ── Controls ─────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .padding(defaultHorizontalPadding, 0.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ControlButton(
-                icon = if (state.songState != SongState.playing) Icons.Filled.PlayArrow
-                       else Icons.Filled.Pause,
-                onClick = { onIntent(PlayerIntent.PlayPause) },
-                accent = true,
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            ControlButton(
-                icon = Icons.Filled.SkipPrevious,
-                onClick = { onIntent(PlayerIntent.Previous) },
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            ControlButton(
-                icon = Icons.Filled.SkipNext,
-                onClick = { onIntent(PlayerIntent.Next) },
-            )
-        }
+        PlayerControls(
+            songState = state.songState,
+            layout = controlLayout,
+            onPlayPause = { onIntent(PlayerIntent.PlayPause) },
+            onPrevious = { onIntent(PlayerIntent.Previous) },
+            onNext = { onIntent(PlayerIntent.Next) },
+        )
 
         Spacer(modifier = Modifier.height(defaultHorizontalPadding + 8.dp))
 
@@ -457,6 +475,55 @@ private fun PositionText(duration: Long, alignment: Alignment) {
 }
 
 // ── Control buttons ──────────────────────────────────────────────────────────
+
+@Composable
+private fun PlayerControls(
+    songState: SongState,
+    layout: ControlLayout,
+    onPlayPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
+    val playPauseIcon = if (songState != SongState.playing) Icons.Filled.PlayArrow else Icons.Filled.Pause
+
+    val horizontalArrangement = when (layout) {
+        ControlLayout.LEFT -> Arrangement.Start
+        ControlLayout.CENTER -> Arrangement.Center
+        ControlLayout.RIGHT -> Arrangement.End
+    }
+
+    Row(
+        modifier = Modifier
+            .padding(defaultHorizontalPadding, 0.dp)
+            .fillMaxWidth(),
+        horizontalArrangement = horizontalArrangement,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        when (layout) {
+            ControlLayout.LEFT -> {
+                ControlButton(icon = playPauseIcon, onClick = onPlayPause, accent = true)
+                Spacer(modifier = Modifier.width(16.dp))
+                ControlButton(icon = Icons.Filled.SkipPrevious, onClick = onPrevious)
+                Spacer(modifier = Modifier.width(8.dp))
+                ControlButton(icon = Icons.Filled.SkipNext, onClick = onNext)
+            }
+            ControlLayout.CENTER -> {
+                ControlButton(icon = Icons.Filled.SkipPrevious, onClick = onPrevious)
+                Spacer(modifier = Modifier.width(16.dp))
+                ControlButton(icon = playPauseIcon, onClick = onPlayPause, accent = true)
+                Spacer(modifier = Modifier.width(16.dp))
+                ControlButton(icon = Icons.Filled.SkipNext, onClick = onNext)
+            }
+            ControlLayout.RIGHT -> {
+                ControlButton(icon = Icons.Filled.SkipPrevious, onClick = onPrevious)
+                Spacer(modifier = Modifier.width(8.dp))
+                ControlButton(icon = Icons.Filled.SkipNext, onClick = onNext)
+                Spacer(modifier = Modifier.width(16.dp))
+                ControlButton(icon = playPauseIcon, onClick = onPlayPause, accent = true)
+            }
+        }
+    }
+}
 
 @Composable
 private fun ControlButton(

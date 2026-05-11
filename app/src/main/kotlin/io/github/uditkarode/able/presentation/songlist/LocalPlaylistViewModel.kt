@@ -46,7 +46,8 @@ class LocalPlaylistViewModel @Inject constructor(
     /** Load all available songs on device for the song picker */
     fun loadAllSongs(): List<Song> {
         val songs = Shared.getSongList(Constants.ableSongDir, context)
-        if (android.content.pm.PackageManager.PERMISSION_GRANTED ==
+        if (Shared.isLocalMusicEnabled(context) &&
+            android.content.pm.PackageManager.PERMISSION_GRANTED ==
             androidx.core.content.ContextCompat.checkSelfPermission(
                 context, android.Manifest.permission.READ_MEDIA_AUDIO
             )

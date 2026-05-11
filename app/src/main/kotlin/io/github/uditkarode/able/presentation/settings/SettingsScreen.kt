@@ -18,6 +18,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.preference.PreferenceManager
 import io.github.uditkarode.able.R
+import io.github.uditkarode.able.utils.Shared
 
 private val Bg      = Color(0xFF212121)
 private val Surface = Color(0xFF2C2C2C)
@@ -54,6 +57,13 @@ fun SettingsScreen(
     onOpenDownloads: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
+    var showAdvanced by remember { mutableStateOf(false) }
+
+    if (showAdvanced) {
+        AdvancedSettingsScreen(onBack = { showAdvanced = false })
+        return
+    }
+
     val context = LocalContext.current
     val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
 
@@ -70,29 +80,7 @@ fun SettingsScreen(
             .statusBarsPadding(),
     ) {
         // ── Toolbar ───────────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .background(Surface)
-                .padding(end = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    painter           = painterResource(R.drawable.down_arrow),
-                    contentDescription = "Back",
-                    tint              = White,
-                    modifier          = Modifier.size(20.dp),
-                )
-            }
-            Text(
-                text       = "Settings",
-                color      = White,
-                fontSize   = 18.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        SettingsToolbar(title = "Settings", onBack = onBack)
 
         Spacer(Modifier.height(8.dp))
 
@@ -115,6 +103,13 @@ fun SettingsScreen(
             title   = "Downloads",
             summary = "View active and queued downloads",
             onClick = onOpenDownloads,
+        )
+        HorizontalDivider(color = Surface, thickness = 0.5.dp)
+
+        PrefRow(
+            title   = "Advanced Settings",
+            summary = "Local music and other options",
+            onClick = { showAdvanced = true },
         )
         HorizontalDivider(color = Surface, thickness = 0.5.dp)
 
@@ -155,6 +150,69 @@ fun SettingsScreen(
     }
 }
 
+// ── Advanced Settings ─────────────────────────────────────────────────────────
+
+@Composable
+private fun AdvancedSettingsScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
+
+    var showLocalMusic by remember {
+        mutableStateOf(prefs.getBoolean(Shared.KEY_SHOW_LOCAL_MUSIC, true))
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Bg)
+            .statusBarsPadding(),
+    ) {
+        SettingsToolbar(title = "Advanced Settings", onBack = onBack)
+
+        Spacer(Modifier.height(8.dp))
+
+        ToggleRow(
+            title = "Show device music",
+            summary = "Display songs from your device's Music folder alongside downloads",
+            checked = showLocalMusic,
+            onCheckedChange = { enabled ->
+                showLocalMusic = enabled
+                prefs.edit().putBoolean(Shared.KEY_SHOW_LOCAL_MUSIC, enabled).apply()
+            },
+        )
+        HorizontalDivider(color = Surface, thickness = 0.5.dp)
+    }
+}
+
+// ── Shared toolbar ────────────────────────────────────────────────────────────
+
+@Composable
+private fun SettingsToolbar(title: String, onBack: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .background(Surface)
+            .padding(end = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                painter            = painterResource(R.drawable.down_arrow),
+                contentDescription = "Back",
+                tint               = White,
+                modifier           = Modifier.size(20.dp),
+            )
+        }
+        Text(
+            text       = title,
+            color      = White,
+            fontSize   = 18.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
 @Composable
 private fun PrefRow(title: String, summary: String, onClick: () -> Unit) {
     Column(
@@ -166,6 +224,38 @@ private fun PrefRow(title: String, summary: String, onClick: () -> Unit) {
         Text(title,   color = White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(3.dp))
         Text(summary, color = Gray,  fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    title: String,
+    summary: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title,   color = White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(3.dp))
+            Text(summary, color = Gray,  fontSize = 13.sp)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Accent,
+                checkedTrackColor = Accent.copy(alpha = 0.4f),
+                uncheckedThumbColor = Gray,
+                uncheckedTrackColor = Gray.copy(alpha = 0.3f),
+            ),
+        )
     }
 }
 

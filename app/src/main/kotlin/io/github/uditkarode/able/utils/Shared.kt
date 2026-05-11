@@ -47,6 +47,14 @@ import java.io.*
 import java.util.*
 
 object Shared {
+    const val KEY_SHOW_LOCAL_MUSIC = "show_local_music"
+
+    /** Whether the user wants to see media from the device Music folder. Default true. */
+    fun isLocalMusicEnabled(context: Context): Boolean {
+        return androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+            .getBoolean(KEY_SHOW_LOCAL_MUSIC, true)
+    }
+
     fun sanitizeFileName(name: String): String {
         return name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
             .replace(Regex("\\s+"), " ")
