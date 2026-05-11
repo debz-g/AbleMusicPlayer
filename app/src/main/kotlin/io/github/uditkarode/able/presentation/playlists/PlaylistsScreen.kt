@@ -71,7 +71,10 @@ import java.io.File
 
 
 private val Accent = Color(0xFF5E92F3)
-private val Green = Color(0xFF1DB954)
+private val SpotifyGreen = Color(0xFF1DB954)
+private val YouTubeRed = Color(0xFFFF0000)
+
+private enum class ImportSource { SPOTIFY, YOUTUBE }
 
 @Composable
 fun PlaylistsScreen(
@@ -89,11 +92,12 @@ fun PlaylistsScreen(
         }
     }
 
-    var spotifyDialogOpen by rememberSaveable { mutableStateOf(false) }
-    var spotifyUrlInput by rememberSaveable { mutableStateOf("") }
-    var spotifyUrlError by rememberSaveable { mutableStateOf(false) }
     var longPressedPlaylist by remember { mutableStateOf<Playlist?>(null) }
     var newPlaylistDialogOpen by rememberSaveable { mutableStateOf(false) }
+    var showSourcePicker by rememberSaveable { mutableStateOf(false) }
+    var importSource by remember { mutableStateOf<ImportSource?>(null) }
+    var importUrlInput by rememberSaveable { mutableStateOf("") }
+    var importUrlError by rememberSaveable { mutableStateOf<String?>(null) }
 
     Column(
         modifier = modifier
@@ -123,28 +127,30 @@ fun PlaylistsScreen(
             ElevatedButton(
                 onClick = {
                     if (state.isImporting) {
-                        viewModel.cancelSpotifyImport()
+                        viewModel.cancelImport()
                     } else {
-                        spotifyUrlInput = ""
-                        spotifyUrlError = false
-                        spotifyDialogOpen = true
+                        showSourcePicker = true
                     }
                 },
                 modifier = Modifier.weight(1f),
                 colors = androidx.compose.material3.ButtonDefaults.elevatedButtonColors(
-                    containerColor = Green,
+                    containerColor = if (state.isImporting) MaterialTheme.colorScheme.error else Accent,
                     contentColor = Color.White,
                 ),
             ) {
-                Icon(
-                    painter = painterResource(
-                        if (state.isImporting) R.drawable.ic_cancle_action else R.drawable.ic_spot
-                    ),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(if (state.isImporting) "Cancel Import" else "Import Spotify")
+                if (state.isImporting) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_cancle_action),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Cancel Import")
+                } else {
+                    Icon(Icons.Filled.Add, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Import Playlist")
+                }
             }
         }
 
@@ -209,22 +215,66 @@ fun PlaylistsScreen(
         )
     }
 
-    if (spotifyDialogOpen) {
-        SpotifyImportDialog(
-            input = spotifyUrlInput,
-            hasError = spotifyUrlError,
-            onInputChange = {
-                spotifyUrlInput = it
-                spotifyUrlError = false
+    // Step 1: Source picker
+    if (showSourcePicker) {
+        ImportSourcePickerDialog(
+            onPickSpotify = {
+                showSourcePicker = false
+                importSource = ImportSource.SPOTIFY
+                importUrlInput = ""
+                importUrlError = null
             },
-            onDismiss = { spotifyDialogOpen = false },
+            onPickYouTube = {
+                showSourcePicker = false
+                importSource = ImportSource.YOUTUBE
+                importUrlInput = ""
+                importUrlError = null
+            },
+            onDismiss = { showSourcePicker = false },
+        )
+    }
+
+    // Step 2: URL input dialog for chosen source
+    importSource?.let { source ->
+        ImportUrlDialog(
+            source = source,
+            input = importUrlInput,
+            errorMessage = importUrlError,
+            onInputChange = {
+                importUrlInput = it
+                importUrlError = null
+            },
+            onDismiss = { importSource = null },
             onConfirm = {
-                val id = parseSpotifyPlaylistId(spotifyUrlInput)
-                if (id == null) {
-                    spotifyUrlError = true
-                } else {
-                    viewModel.startSpotifyImport(id)
-                    spotifyDialogOpen = false
+                when (source) {
+                    ImportSource.SPOTIFY -> {
+                        // Reject if it looks like a YouTube URL
+                        if (looksLikeYouTubeUrl(importUrlInput)) {
+                            importUrlError = "That looks like a YouTube URL. Use the YouTube Music option instead."
+                        } else {
+                            val id = parseSpotifyPlaylistId(importUrlInput)
+                            if (id == null) {
+                                importUrlError = "Invalid Spotify playlist URL"
+                            } else {
+                                viewModel.startSpotifyImport(id)
+                                importSource = null
+                            }
+                        }
+                    }
+                    ImportSource.YOUTUBE -> {
+                        // Reject if it looks like a Spotify URL
+                        if (looksLikeSpotifyUrl(importUrlInput)) {
+                            importUrlError = "That looks like a Spotify URL. Use the Spotify option instead."
+                        } else {
+                            val url = parseYouTubePlaylistUrl(importUrlInput)
+                            if (url == null) {
+                                importUrlError = "Invalid YouTube Music playlist URL"
+                            } else {
+                                viewModel.startYouTubeImport(url)
+                                importSource = null
+                            }
+                        }
+                    }
                 }
             },
         )
@@ -393,41 +443,122 @@ private fun ThumbnailCell(song: Song, modifier: Modifier = Modifier) {
     )
 }
 
-// ── Dialogs ─────────────────────────────────────────────────────────────────
+// ── Import Dialogs ──────────────────────────────────────────────────────────
 
 @Composable
-private fun SpotifyImportDialog(
-    input: String,
-    hasError: Boolean,
-    onInputChange: (String) -> Unit,
+private fun ImportSourcePickerDialog(
+    onPickSpotify: () -> Unit,
+    onPickYouTube: () -> Unit,
     onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        title = { Text("Import Spotify Playlist") },
+        title = { Text("Import from") },
+        text = {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SpotifyGreen.copy(alpha = 0.12f))
+                        .clickable(onClick = onPickSpotify)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_spot),
+                        contentDescription = null,
+                        tint = SpotifyGreen,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text("Spotify", fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 15.sp)
+                        Text("Import from a Spotify playlist URL", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(YouTubeRed.copy(alpha = 0.12f))
+                        .clickable(onClick = onPickYouTube)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        tint = YouTubeRed,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text("YouTube Music", fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 15.sp)
+                        Text("Import from a YouTube or YT Music playlist URL", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+        shape = RoundedCornerShape(20.dp),
+    )
+}
+
+@Composable
+private fun ImportUrlDialog(
+    source: ImportSource,
+    input: String,
+    errorMessage: String?,
+    onInputChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val accentColor = when (source) {
+        ImportSource.SPOTIFY -> SpotifyGreen
+        ImportSource.YOUTUBE -> YouTubeRed
+    }
+    val title = when (source) {
+        ImportSource.SPOTIFY -> "Import Spotify Playlist"
+        ImportSource.YOUTUBE -> "Import YouTube Playlist"
+    }
+    val label = when (source) {
+        ImportSource.SPOTIFY -> "Spotify playlist URL"
+        ImportSource.YOUTUBE -> "YouTube playlist URL"
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        title = { Text(title) },
         text = {
             Column {
                 OutlinedTextField(
                     value = input,
                     onValueChange = onInputChange,
-                    label = { Text("Spotify playlist URL") },
-                    isError = hasError,
+                    label = { Text(label) },
+                    isError = errorMessage != null,
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Green,
-                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedBorderColor = accentColor,
+                        cursorColor = accentColor,
                     ),
                 )
-                if (hasError) {
+                if (errorMessage != null) {
                     Spacer(Modifier.height(4.dp))
-                    Text("Invalid Spotify playlist URL", color = Color.Red, fontSize = 12.sp)
+                    Text(errorMessage, color = Color.Red, fontSize = 12.sp)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text("Import", color = Green) }
+            TextButton(onClick = onConfirm) { Text("Import", color = accentColor) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -563,11 +694,50 @@ private fun CreatePlaylistDialog(
     )
 }
 
+// ── URL Parsing & Validation ────────────────────────────────────────────────
+
 private fun parseSpotifyPlaylistId(url: String): String? {
-    val parts = url.replace("https://", "").split("/").toMutableList()
+    val parts = url.replace("https://", "").replace("http://", "").split("/").toMutableList()
     if (parts.isEmpty() || parts[0] != "open.spotify.com") return null
     val playlistIndex = parts.indexOf("playlist")
     if (playlistIndex == -1 || playlistIndex + 1 >= parts.size) return null
     val raw = parts[playlistIndex + 1]
     return if (raw.contains("?")) raw.split("?")[0] else raw
+}
+
+/**
+ * Accepts YouTube and YouTube Music playlist URLs in various formats:
+ * - https://www.youtube.com/playlist?list=PLxxxxxx
+ * - https://music.youtube.com/playlist?list=PLxxxxxx
+ * - https://youtube.com/playlist?list=PLxxxxxx
+ * - https://www.youtube.com/watch?v=xxx&list=PLxxxxxx
+ * - https://music.youtube.com/watch?v=xxx&list=PLxxxxxx
+ *
+ * Returns a canonical playlist URL for NewPipe extractor.
+ */
+private fun parseYouTubePlaylistUrl(url: String): String? {
+    val cleaned = url.trim()
+    // Extract list= parameter
+    val listId = Regex("[?&]list=([A-Za-z0-9_-]+)").find(cleaned)?.groupValues?.get(1)
+    if (listId != null) {
+        // Validate that the domain is YouTube
+        val lower = cleaned.lowercase()
+        if (lower.contains("youtube.com") || lower.contains("youtu.be")) {
+            return "https://www.youtube.com/playlist?list=$listId"
+        }
+        return null
+    }
+    // Also accept direct playlist path: youtube.com/playlist?list=...
+    // Already handled above via regex
+    return null
+}
+
+private fun looksLikeYouTubeUrl(url: String): Boolean {
+    val lower = url.trim().lowercase()
+    return lower.contains("youtube.com") || lower.contains("youtu.be") || lower.contains("music.youtube")
+}
+
+private fun looksLikeSpotifyUrl(url: String): Boolean {
+    val lower = url.trim().lowercase()
+    return lower.contains("spotify.com") || lower.contains("open.spotify")
 }

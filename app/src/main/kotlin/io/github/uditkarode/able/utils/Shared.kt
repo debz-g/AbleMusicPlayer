@@ -324,11 +324,11 @@ object Shared {
     fun getBestThumbnail(thumbnails: List<Image>, videoUrl: String): String {
         if (thumbnails.isEmpty()) return ""
 
-        // Try to construct a high-res ytimg URL
+        // Try to construct a high-res ytimg URL (hqdefault is more reliable than maxresdefault)
         for (thumbnail in thumbnails) {
             if (thumbnail.url.contains("ytimg")) {
                 val songId = getIdFromLink(videoUrl)
-                return "https://i.ytimg.com/vi/$songId/maxresdefault.jpg"
+                return "https://i.ytimg.com/vi/$songId/hqdefault.jpg"
             }
         }
 

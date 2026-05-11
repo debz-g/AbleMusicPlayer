@@ -151,6 +151,21 @@
 -dontwarn org.openjsse.javax.net.ssl.SSLSocket
 -dontwarn org.openjsse.net.ssl.OpenJSSE
 
+# NewPipeExtractor — keep all extractor classes (uses reflection internally)
+-keep class org.schabi.newpipe.extractor.** { *; }
+-dontwarn org.schabi.newpipe.extractor.**
+
+# Protobuf — NewPipe extractor uses protobuf with reflection for field access
+-keep class com.google.protobuf.** { *; }
+-keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite {
+    <fields>;
+    <methods>;
+}
+-keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite$Builder {
+    <fields>;
+    <methods>;
+}
+
 # NewPipeExtractor dependencies (Rhino JS engine, jsoup, dynalink)
 # These reference JVM-only classes not available on Android
 -dontwarn com.google.re2j.**

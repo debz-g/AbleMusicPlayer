@@ -12,8 +12,10 @@ import io.github.uditkarode.able.model.Playlist
 import io.github.uditkarode.able.model.song.Song
 import io.github.uditkarode.able.services.MusicService
 import io.github.uditkarode.able.services.SpotifyImportService
+import io.github.uditkarode.able.services.YouTubeImportService
 import io.github.uditkarode.able.utils.Constants
 import io.github.uditkarode.able.utils.Shared
+import io.github.uditkarode.able.utils.YouTubeMusicImport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -79,7 +81,18 @@ class PlaylistsViewModel @Inject constructor(
         }
     }
 
-    fun cancelSpotifyImport() {
+    fun startYouTubeImport(playlistUrl: String) {
+        val intent = Intent(context, YouTubeImportService::class.java)
+            .putExtra("playlistUrl", playlistUrl)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
+    }
+
+    fun cancelImport() {
+        YouTubeMusicImport.cancelImport()
         MusicService.registeredClients.forEach { it.spotifyImportChange(false) }
     }
 

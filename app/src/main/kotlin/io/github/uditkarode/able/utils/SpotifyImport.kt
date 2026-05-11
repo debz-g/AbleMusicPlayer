@@ -112,6 +112,7 @@ object SpotifyImport {
                 try {
                     val song = downloadFromYouTubeMusic(
                         "${track.title} - ${track.artist}",
+                        track.artist,
                         builder, context, i, totalTracks
                     )
                     if (song != null) {
@@ -149,6 +150,7 @@ object SpotifyImport {
 
     private fun downloadFromYouTubeMusic(
         query: String,
+        spotifyArtist: String,
         builder: Notification.Builder,
         context: Context,
         trackIndex: Int,
@@ -184,7 +186,7 @@ object SpotifyImport {
             currentTrackStatus = "Already exists"
             return Song(
                 name = searchResult.name,
-                artist = searchResult.uploaderName,
+                artist = spotifyArtist.ifBlank { searchResult.uploaderName },
                 youtubeLink = searchResult.url,
                 filePath = existingFile.absolutePath,
                 ytmThumbnail = thumbnailUrl
@@ -235,12 +237,15 @@ object SpotifyImport {
         val idFile = File(Constants.ableSongDir, "$songId.$ext")
         tempFile.renameTo(idFile)
 
+        // Use Spotify artist name (authoritative); fall back to YouTube uploader
+        val artistName = spotifyArtist.ifBlank { searchResult.uploaderName }
+
         // Write metadata tags with jaudiotagger
         runCatching {
             val audioFile = AudioFileIO.read(idFile)
             val tag = audioFile.tagOrCreateAndSetDefault
             tag.setField(FieldKey.TITLE, searchResult.name)
-            tag.setField(FieldKey.ARTIST, searchResult.uploaderName)
+            tag.setField(FieldKey.ARTIST, artistName)
             tag.setField(FieldKey.COMMENT, songId)
             audioFile.commit()
         }.onFailure { Log.e(TAG, "Tag write failed for $songId: $it") }
@@ -266,7 +271,7 @@ object SpotifyImport {
 
         return Song(
             name = searchResult.name,
-            artist = searchResult.uploaderName,
+            artist = artistName,
             youtubeLink = searchResult.url,
             filePath = finalFile.absolutePath,
             ytmThumbnail = thumbnailUrl
